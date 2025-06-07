@@ -4,8 +4,10 @@ import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/nguoi_dung.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:path/path.dart'; // thêm import này nếu chưa có
+import 'package:path/path.dart';
+import 'package:provider/provider.dart'; // thêm import này nếu chưa có
 
 class ManHinhChinhSuaHoSo extends StatefulWidget {
   final NguoiDung nguoiDung;
@@ -104,6 +106,9 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
         'gioiTinh': _gioiTinh,
         'anhDaiDien': anhDaiDienUrl,
       });
+      // Cập nhật lại thông tin người dùng trong ứng dụng
+      await Provider.of<DangKiDangNhapEmail>(context, listen: false)
+          .layNguoiDungHienTai();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
