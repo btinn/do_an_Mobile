@@ -1,18 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/nguoi_dung.dart';
-import 'package:provider/provider.dart';
-import 'package:do_an/dich_vu/dich_vu_cai_dat.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
 class ManHinhChinhSuaHoSo extends StatefulWidget {
   final NguoiDung nguoiDung;
 
-  const ManHinhChinhSuaHoSo({
-    super.key,
-    required this.nguoiDung,
-  });
+  const ManHinhChinhSuaHoSo({super.key, required this.nguoiDung});
 
   @override
   State<ManHinhChinhSuaHoSo> createState() => _ManHinhChinhSuaHoSoState();
@@ -21,7 +17,6 @@ class ManHinhChinhSuaHoSo extends StatefulWidget {
 class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _hoTenController;
-  late TextEditingController _emailController;
   late TextEditingController _moTaController;
   late TextEditingController _soDienThoaiController;
   late TextEditingController _diaChiController;
@@ -34,7 +29,6 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
   void initState() {
     super.initState();
     _hoTenController = TextEditingController(text: widget.nguoiDung.hoTen);
-    _emailController = TextEditingController(text: widget.nguoiDung.email);
     _moTaController = TextEditingController(text: widget.nguoiDung.moTa);
     _soDienThoaiController =
         TextEditingController(text: widget.nguoiDung.soDienThoai);
@@ -47,7 +41,6 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
   @override
   void dispose() {
     _hoTenController.dispose();
-    _emailController.dispose();
     _moTaController.dispose();
     _soDienThoaiController.dispose();
     _diaChiController.dispose();
@@ -56,9 +49,8 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
   }
 
   Future<void> _chonAnhDaiDien() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
         _anhDaiDien = File(image.path);
@@ -67,47 +59,49 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
   }
 
   Future<void> _luuThongTin() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _dangLuu = true;
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _dangLuu = true;
+    });
+
+    try {
+      final docRef = FirebaseFirestore.instance
+          .collection('user')
+          .doc(widget.nguoiDung.ma);
+
+      await docRef.update({
+        'hoTen': _hoTenController.text,
+        'moTa': _moTaController.text,
+        'soDienThoai': _soDienThoaiController.text,
+        'diaChi': _diaChiController.text,
+        'ngaySinh': _ngaySinhController.text,
+        'gioiTinh': _gioiTinh,
+        'anhDaiDien': _anhDaiDien != null
+            ? 'assets/images/avatar_updated.jpg' // bạn nên upload lên Firebase Storage
+            : widget.nguoiDung.anhDaiDien,
       });
 
-      // Giả lập thời gian xử lý
-      await Future.delayed(const Duration(seconds: 1));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thông tin hồ sơ đã được cập nhật'),
+          backgroundColor: ChuDe.mauXanhLa,
+        ),
+      );
 
-      if (mounted) {
-        // final dichVuDuLieu = Provider.of<DichVuDuLieu>(context, listen: false);
-
-        // Cập nhật thông tin người dùng
-        final nguoiDungCapNhat = widget.nguoiDung.copyWith(
-          hoTen: _hoTenController.text,
-          email: _emailController.text,
-          moTa: _moTaController.text,
-          soDienThoai: _soDienThoaiController.text,
-          diaChi: _diaChiController.text,
-          ngaySinh: _ngaySinhController.text,
-          gioiTinh: _gioiTinh,
-          // Trong thực tế, cần xử lý upload ảnh lên server và lấy URL
-          anhDaiDien: _anhDaiDien != null
-              ? 'assets/images/avatar_updated.jpg'
-              : widget.nguoiDung.anhDaiDien,
-        );
-
-        // dichVuDuLieu.capNhatThongTinNguoiDung(nguoiDungCapNhat);
-
-        setState(() {
-          _dangLuu = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Thông tin hồ sơ đã được cập nhật'),
-            backgroundColor: ChuDe.mauXanhLa,
-          ),
-        );
-
-        Navigator.pop(context);
-      }
+      Navigator.pop(context);
+    } catch (e) {
+      print('Lỗi cập nhật hồ sơ: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã xảy ra lỗi khi cập nhật'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _dangLuu = false;
+      });
     }
   }
 
@@ -130,9 +124,7 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
                   )
                 : const Icon(Icons.check),
             label: const Text('Lưu'),
-            style: TextButton.styleFrom(
-              foregroundColor: ChuDe.mauChinh,
-            ),
+            style: TextButton.styleFrom(foregroundColor: ChuDe.mauChinh),
           ),
         ],
       ),
@@ -141,17 +133,18 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Ảnh đại diện
               Center(
                 child: Stack(
                   children: [
                     CircleAvatar(
-                      radius: 60,
+                      radius: 47,
                       backgroundImage: _anhDaiDien != null
-                          ? FileImage(_anhDaiDien!) as ImageProvider
-                          : AssetImage(widget.nguoiDung.anhDaiDien),
+                          ? FileImage(_anhDaiDien!)
+                          : (widget.nguoiDung.anhDaiDien.startsWith('http')
+                                  ? NetworkImage(widget.nguoiDung.anhDaiDien)
+                                  : AssetImage(widget.nguoiDung.anhDaiDien))
+                              as ImageProvider,
                     ),
                     Positioned(
                       bottom: 0,
@@ -163,16 +156,10 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
                           decoration: BoxDecoration(
                             color: ChuDe.mauChinh,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 2,
-                            ),
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: 20,
-                          ),
+                          child: const Icon(Icons.camera_alt,
+                              color: Colors.white, size: 20),
                         ),
                       ),
                     ),
@@ -180,102 +167,20 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Thông tin cá nhân
-              const Text(
-                'Thông Tin Cá Nhân',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              _xayDungTextField(
+                  'Tên Người Dùng', _hoTenController, Icons.person,
+                  required: true),
+              _xayDungTextField('Mô Tả', _moTaController, Icons.description,
+                  maxLines: 3),
+              _xayDungTextField(
+                  'Số Điện Thoại', _soDienThoaiController, Icons.phone),
+              _xayDungTextField(
+                  'Địa Chỉ', _diaChiController, Icons.location_on),
+              _xayDungTextField('Ngày Sinh (DD/MM/YYYY)', _ngaySinhController,
+                  Icons.calendar_today),
               const SizedBox(height: 16),
-
-              // Họ tên
-              TextFormField(
-                controller: _hoTenController,
-                decoration: const InputDecoration(
-                  labelText: 'Tên Người Dùng',
-                  prefixIcon: Icon(Icons.person),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vui lòng nhập họ tên';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Email
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: Icon(Icons.email),
-                ),
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vui lòng nhập email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Mô tả
-              TextFormField(
-                controller: _moTaController,
-                decoration: const InputDecoration(
-                  labelText: 'Mô Tả',
-                  prefixIcon: Icon(Icons.description),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-
-              // Số điện thoại
-              TextFormField(
-                controller: _soDienThoaiController,
-                decoration: const InputDecoration(
-                  labelText: 'Số Điện Thoại',
-                  prefixIcon: Icon(Icons.phone),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-
-              // Địa chỉ
-              TextFormField(
-                controller: _diaChiController,
-                decoration: const InputDecoration(
-                  labelText: 'Địa Chỉ',
-                  prefixIcon: Icon(Icons.location_on),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Ngày sinh
-              TextFormField(
-                controller: _ngaySinhController,
-                decoration: const InputDecoration(
-                  labelText: 'Ngày Sinh (DD/MM/YYYY)',
-                  prefixIcon: Icon(Icons.calendar_today),
-                ),
-                keyboardType: TextInputType.datetime,
-              ),
-              const SizedBox(height: 16),
-
-              // Giới tính
-              const Text(
-                'Giới Tính',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
+              const Text('Giới Tính',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               Row(
                 children: [
                   Expanded(
@@ -283,11 +188,7 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
                       title: const Text('Nam'),
                       value: 'Nam',
                       groupValue: _gioiTinh,
-                      onChanged: (value) {
-                        setState(() {
-                          _gioiTinh = value!;
-                        });
-                      },
+                      onChanged: (value) => setState(() => _gioiTinh = value!),
                     ),
                   ),
                   Expanded(
@@ -295,18 +196,12 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
                       title: const Text('Nữ'),
                       value: 'Nữ',
                       groupValue: _gioiTinh,
-                      onChanged: (value) {
-                        setState(() {
-                          _gioiTinh = value!;
-                        });
-                      },
+                      onChanged: (value) => setState(() => _gioiTinh = value!),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-
-              // Nút lưu
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -320,20 +215,39 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
                     ),
                   ),
                   child: _dangLuu
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
+                      ? const CircularProgressIndicator(color: Colors.white)
                       : const Text('Lưu Thông Tin'),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _xayDungTextField(
+      String label, TextEditingController controller, IconData icon,
+      {bool required = false, bool email = false, int maxLines = 1}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+        ),
+        maxLines: maxLines,
+        keyboardType: email ? TextInputType.emailAddress : TextInputType.text,
+        validator: (value) {
+          if (required && (value == null || value.isEmpty)) {
+            return 'Vui lòng nhập $label';
+          }
+          if (email && value != null && !value.contains('@')) {
+            return 'Email không hợp lệ';
+          }
+          return null;
+        },
       ),
     );
   }
