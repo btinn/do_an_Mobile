@@ -1,7 +1,6 @@
 import 'package:do_an/dich_vu/dich_vu_cong_thuc.dart';
 import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:do_an/dich_vu/dich_vu_thong_bao.dart';
-import 'package:do_an/man_hinh/chinh/man_hinh_tim_kiem.dart';
 import 'package:flutter/material.dart';
 import 'package:do_an/mo_hinh/cong_thuc.dart';
 import 'package:do_an/mo_hinh/thong_bao.dart';
@@ -14,7 +13,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_carousel_widget/flutter_carousel_widget.dart';
 
 class ManHinhTrangChu extends StatefulWidget {
-  const ManHinhTrangChu({super.key});
+  final VoidCallback? onChuyenSangTimKiem;
+
+  const ManHinhTrangChu({
+    super.key,
+    this.onChuyenSangTimKiem,
+  });
 
   @override
   State<ManHinhTrangChu> createState() => _ManHinhTrangChuState();
@@ -38,7 +42,7 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
   final ScrollController _scrollController = ScrollController();
   bool _hienThiAppBarMoRong = true;
   List<CongThuc> danhSachCongThuc = [];
-  
+
   // Thêm biến cho thông báo
   final DichVuThongBao _dichVuThongBao = DichVuThongBao();
   List<ThongBao> _danhSachThongBao = [];
@@ -102,14 +106,17 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
   }
 
   Future<void> _taiThongBao() async {
-    final dangNhapService = Provider.of<DangKiDangNhapEmail>(context, listen: false);
+    final dangNhapService =
+        Provider.of<DangKiDangNhapEmail>(context, listen: false);
     final nguoiDung = dangNhapService.nguoiDungHienTai;
-    
+
     if (nguoiDung != null) {
       try {
-        final danhSach = await _dichVuThongBao.layDanhSachThongBao(nguoiDung.ma);
-        final soThongBaoChuaDoc = await _dichVuThongBao.demThongBaoChuaDoc(nguoiDung.ma);
-        
+        final danhSach =
+            await _dichVuThongBao.layDanhSachThongBao(nguoiDung.ma);
+        final soThongBaoChuaDoc =
+            await _dichVuThongBao.demThongBaoChuaDoc(nguoiDung.ma);
+
         setState(() {
           _danhSachThongBao = danhSach;
           _soThongBaoChuaDoc = soThongBaoChuaDoc;
@@ -131,11 +138,13 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
   }
 
   Future<void> _capNhatSoThongBaoChuaDoc() async {
-    final dangNhapService = Provider.of<DangKiDangNhapEmail>(context, listen: false);
+    final dangNhapService =
+        Provider.of<DangKiDangNhapEmail>(context, listen: false);
     final nguoiDung = dangNhapService.nguoiDungHienTai;
-    
+
     if (nguoiDung != null) {
-      final soThongBaoChuaDoc = await _dichVuThongBao.demThongBaoChuaDoc(nguoiDung.ma);
+      final soThongBaoChuaDoc =
+          await _dichVuThongBao.demThongBaoChuaDoc(nguoiDung.ma);
       setState(() {
         _soThongBaoChuaDoc = soThongBaoChuaDoc;
       });
@@ -166,6 +175,7 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
               snap: false,
               backgroundColor: Colors.white,
               elevation: 0,
+              automaticallyImplyLeading: false, // Tắt nút back mặc định
               title: Row(
                 children: [
                   CircleAvatar(
@@ -201,7 +211,8 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                 IconButton(
                   icon: Stack(
                     children: [
-                      const Icon(Icons.notifications_outlined, color: ChuDe.mauChu),
+                      const Icon(Icons.notifications_outlined,
+                          color: ChuDe.mauChu),
                       if (_soThongBaoChuaDoc > 0)
                         Positioned(
                           right: 0,
@@ -217,7 +228,9 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                               minHeight: 14,
                             ),
                             child: Text(
-                              _soThongBaoChuaDoc > 99 ? '99+' : _soThongBaoChuaDoc.toString(),
+                              _soThongBaoChuaDoc > 99
+                                  ? '99+'
+                                  : _soThongBaoChuaDoc.toString(),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 8,
@@ -243,12 +256,10 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                             horizontal: 16, vertical: 8),
                         child: GestureDetector(
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ManHinhTimKiem(),
-                              ),
-                            );
+                            // Chuyển sang tab tìm kiếm thay vì navigate
+                            if (widget.onChuyenSangTimKiem != null) {
+                              widget.onChuyenSangTimKiem!();
+                            }
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -445,15 +456,19 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                   ),
                   TextButton(
                     onPressed: () async {
-                      final dangNhapService = Provider.of<DangKiDangNhapEmail>(context, listen: false);
+                      final dangNhapService = Provider.of<DangKiDangNhapEmail>(
+                          context,
+                          listen: false);
                       final nguoiDung = dangNhapService.nguoiDungHienTai;
-                      
+
                       if (nguoiDung != null) {
                         await _dichVuThongBao.danhDauTatCaDaDoc(nguoiDung.ma);
                         await _capNhatSoThongBaoChuaDoc();
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Đã đánh dấu tất cả thông báo là đã đọc')),
+                          const SnackBar(
+                              content: Text(
+                                  'Đã đánh dấu tất cả thông báo là đã đọc')),
                         );
                       }
                     },
@@ -468,7 +483,8 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.notifications_none, size: 64, color: Colors.grey),
+                          Icon(Icons.notifications_none,
+                              size: 64, color: Colors.grey),
                           SizedBox(height: 16),
                           Text(
                             'Chưa có thông báo nào',
@@ -494,7 +510,7 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
   Widget _xayDungThongBao(ThongBao thongBao) {
     IconData icon;
     Color mauIcon;
-    
+
     switch (thongBao.loai) {
       case 'thich':
         icon = Icons.favorite;
@@ -542,9 +558,10 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
         ),
         onTap: () async {
           // Đánh dấu đã đọc
-          final dangNhapService = Provider.of<DangKiDangNhapEmail>(context, listen: false);
+          final dangNhapService =
+              Provider.of<DangKiDangNhapEmail>(context, listen: false);
           final nguoiDung = dangNhapService.nguoiDungHienTai;
-          
+
           if (nguoiDung != null && !thongBao.daDoc) {
             await _dichVuThongBao.danhDauDaDoc(nguoiDung.ma, thongBao.ma);
             await _capNhatSoThongBaoChuaDoc();
@@ -558,11 +575,12 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
               (ct) => ct.ma == thongBao.maCongThuc,
               orElse: () => danhSachCongThuc.first,
             );
-            
+
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => ManHinhChiTietCongThuc(congThuc: congThuc),
+                builder: (context) =>
+                    ManHinhChiTietCongThuc(congThuc: congThuc),
               ),
             );
           }
@@ -683,10 +701,7 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
           ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
 
           const SizedBox(height: 16),
-<<<<<<< HEAD
-=======
-          
->>>>>>> hzuy
+
           // Danh sách công thức sau khi lọc
           GridView.builder(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
