@@ -53,3 +53,5 @@ class NguoiDung {
     );
   }
 }
+
+// tin khung
