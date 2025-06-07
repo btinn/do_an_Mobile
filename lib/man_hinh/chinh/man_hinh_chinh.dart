@@ -3,7 +3,7 @@ import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_trang_chu.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_tim_kiem.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_them_cong_thuc.dart';
-import 'package:do_an/man_hinh/chinh/man_hinh_yeu_thich.dart';
+import 'package:do_an/man_hinh/chinh/man_hinh_hop_thu.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_ho_so.dart';
 
 class ManHinhChinh extends StatefulWidget {
@@ -31,7 +31,7 @@ class _ManHinhChinhState extends State<ManHinhChinh> {
       ),
       const ManHinhTimKiem(),
       const ManHinhThemCongThuc(),
-      const ManHinhYeuThich(),
+      const ManHinhHopThu(), // Thay đổi từ ManHinhYeuThich thành ManHinhHopThu
       const ManHinhHoSo(),
     ];
   }
@@ -92,9 +92,9 @@ class _ManHinhChinhState extends State<ManHinhChinh> {
               label: 'Thêm',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.favorite_border),
-              activeIcon: Icon(Icons.favorite),
-              label: 'Yêu Thích',
+              icon: Icon(Icons.message_outlined),
+              activeIcon: Icon(Icons.message),
+              label: 'Hộp Thư',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
