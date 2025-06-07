@@ -16,13 +16,25 @@ class ManHinhChinh extends StatefulWidget {
 class _ManHinhChinhState extends State<ManHinhChinh> {
   int _chiSoHienTai = 0;
   
-  final List<Widget> _manHinh = [
-    const ManHinhTrangChu(),
-    const ManHinhTimKiem(),
-    const ManHinhThemCongThuc(),
-    const ManHinhYeuThich(),
-    const ManHinhHoSo(),
-  ];
+  late List<Widget> _manHinh;
+
+  @override
+  void initState() {
+    super.initState();
+    _manHinh = [
+      ManHinhTrangChu(
+        onChuyenSangTimKiem: () {
+          setState(() {
+            _chiSoHienTai = 1; // Chuyển sang tab tìm kiếm (index 1)
+          });
+        },
+      ),
+      const ManHinhTimKiem(),
+      const ManHinhThemCongThuc(),
+      const ManHinhYeuThich(),
+      const ManHinhHoSo(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
