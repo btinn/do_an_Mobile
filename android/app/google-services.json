@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "484523918985",
+    "firebase_url": "https://cookpad-2e6f8-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "cookpad-2e6f8",
+    "storage_bucket": "cookpad-2e6f8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:484523918985:android:17c265128c429e430a2858",
+        "android_client_info": {
+          "package_name": "com.example.do_an"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "484523918985-qf9alek67dgdbj569hs78d3bru46q3g8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.do_an",
+            "certificate_hash": "7c3d2c2cb040bafd45410c95f461ab199d9fc946"
+          }
+        },
+        {
+          "client_id": "484523918985-qkisrvdfmgj5fnvrmhqfpso6ul0mi30g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdZbMK1gQ7T4fBDFsKfJ0yctMEBmkAkbs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "484523918985-qkisrvdfmgj5fnvrmhqfpso6ul0mi30g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
