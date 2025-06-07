@@ -30,7 +30,7 @@ void main() async {
   );
 }
 
-//Huy khung dien
+//Huy 
 class AmThucVietApp extends StatelessWidget {
   const AmThucVietApp({super.key});
 
