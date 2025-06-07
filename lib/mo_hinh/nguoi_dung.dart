@@ -54,4 +54,4 @@ class NguoiDung {
   }
 }
 
-// tin khung
+// tin khung dien
