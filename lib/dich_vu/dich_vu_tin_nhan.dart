@@ -87,180 +87,229 @@ class DichVuTinNhan {
     });
   }
 
-  // Lấy danh sách cuộc trò chuyện tóm tắt
-  Future<List<CuocTroChuyenTomTat>> layDanhSachCuocTroChuyenTomTat(String maNguoiDung) async {
-    final snapshot = await _db.child('cuoc_tro_chuyen').child(maNguoiDung).get();
-    
-    if (!snapshot.exists) return [];
-
-    final List<CuocTroChuyenTomTat> danhSach = [];
-    
-    for (final child in snapshot.children) {
-      try {
-        final data = child.value as Map<dynamic, dynamic>?;
-        if (data == null) continue;
-
-        danhSach.add(CuocTroChuyenTomTat(
-          maNguoiKhac: data['maNguoiKhac'] ?? '',
-          tenNguoiKhac: data['tenNguoiKhac'] ?? '',
-          anhNguoiKhac: data['anhNguoiKhac'] ?? '',
-          tinNhanCuoi: data['tinNhanCuoi'] ?? '',
-          loaiTinNhanCuoi: data['loaiTinNhanCuoi'] ?? 'text',
-          thoiGianCuoi: DateTime.fromMillisecondsSinceEpoch(data['thoiGianCuoi'] ?? 0),
-          soTinNhanChuaDoc: data['soTinNhanChuaDoc'] ?? 0,
-          dangOnline: data['dangOnline'] ?? false,
-        ));
-      } catch (e) {
-        print('Lỗi khi chuyển đổi cuộc trò chuyện: $e');
-      }
-    }
-
-    // Sắp xếp theo thời gian mới nhất
-    danhSach.sort((a, b) => b.thoiGianCuoi.compareTo(a.thoiGianCuoi));
-    
-    return danhSach;
+  // Lấy danh sách cuộc trò chuyện tóm tắt với dữ liệu mẫu
+  Future<List<CuocTroChuyenTomTat>> layDanhSachCuocTroChuyenTomTat(
+      String maNguoiDung) async {
+    // Trả về dữ liệu mẫu thay vì từ Firebase
+    return _layDuLieuMau();
   }
 
-  // Lấy tin nhắn trong cuộc trò chuyện
-  Future<List<TinNhan>> layTinNhanTrongCuocTroChuyenId(String cuocTroChuyenId) async {
-    final snapshot = await _db.child('tin_nhan').child(cuocTroChuyenId).get();
-    
-    if (!snapshot.exists) return [];
+  // Tạo dữ liệu mẫu
+  List<CuocTroChuyenTomTat> _layDuLieuMau() {
+    final now = DateTime.now();
 
-    final List<TinNhan> danhSach = [];
-    
-    for (final child in snapshot.children) {
-      try {
-        final data = child.value as Map<dynamic, dynamic>?;
-        if (data == null) continue;
+    return [
+      CuocTroChuyenTomTat(
+        maNguoiKhac: 'user_system',
+        tenNguoiKhac: 'Thông báo hệ thống',
+        anhNguoiKhac: 'https://i.pravatar.cc/150?img=2',
+        tinNhanCuoi: 'LIVE: LIVE Studio hiệu...',
+        loaiTinNhanCuoi: 'text',
+        thoiGianCuoi: now.subtract(const Duration(days: 1)),
+        soTinNhanChuaDoc: 1,
+        dangOnline: false,
+      ),
+      CuocTroChuyenTomTat(
+        maNguoiKhac: 'user_tiktokshop',
+        tenNguoiKhac: 'TikTok Shop',
+        anhNguoiKhac: 'https://i.pravatar.cc/150?img=3',
+        tinNhanCuoi: '29 tin cập nhật của c...',
+        loaiTinNhanCuoi: 'text',
+        thoiGianCuoi: now.subtract(const Duration(days: 2)),
+        soTinNhanChuaDoc: 57,
+        dangOnline: false,
+      ),
+    ];
+  }
 
-        danhSach.add(TinNhan.fromMap(Map<String, dynamic>.from(data)));
-      } catch (e) {
-        print('Lỗi khi chuyển đổi tin nhắn: $e');
-      }
+  // Lấy tin nhắn trong cuộc trò chuyện với dữ liệu mẫu
+  Future<List<TinNhan>> layTinNhanTrongCuocTroChuyenId(
+      String cuocTroChuyenId) async {
+    // Trả về dữ liệu mẫu dựa trên cuocTroChuyenId
+    return _layTinNhanMau(cuocTroChuyenId);
+  }
+
+  // Tạo tin nhắn mẫu cho từng cuộc trò chuyện
+  List<TinNhan> _layTinNhanMau(String cuocTroChuyenId) {
+    final now = DateTime.now();
+
+    // Dựa vào cuocTroChuyenId để tạo tin nhắn phù hợp
+    if (cuocTroChuyenId.contains('user_thihin')) {
+      return [
+        TinNhan(
+          ma: '1',
+          maNguoiGui: 'user_thihin',
+          tenNguoiGui: 'thi hin',
+          anhNguoiGui: 'https://i.pravatar.cc/150?img=1',
+          maNguoiNhan: 'current_user',
+          tenNguoiNhan: 'Bạn',
+          anhNguoiNhan: 'https://i.pravatar.cc/150?img=50',
+          noiDung: 'Hãy chào thi hin',
+          loai: 'text',
+          thoiGian: now.subtract(const Duration(minutes: 5)),
+          daDoc: false,
+        ),
+      ];
+    } else if (cuocTroChuyenId.contains('user_seto666')) {
+      return [
+        TinNhan(
+          ma: '2',
+          maNguoiGui: 'user_seto666',
+          tenNguoiGui: 'Seto.666✝',
+          anhNguoiGui: 'https://i.pravatar.cc/150?img=4',
+          maNguoiNhan: 'current_user',
+          tenNguoiNhan: 'Bạn',
+          anhNguoiNhan: 'https://i.pravatar.cc/150?img=50',
+          noiDung: 'Hãy chào Seto.666✝',
+          loai: 'text',
+          thoiGian: now.subtract(const Duration(hours: 3)),
+          daDoc: false,
+        ),
+      ];
+    } else if (cuocTroChuyenId.contains('user_juno')) {
+      return [
+        TinNhan(
+          ma: '3',
+          maNguoiGui: 'user_juno',
+          tenNguoiGui: 'JUNO.OKYO 🇻🇳',
+          anhNguoiGui: 'https://i.pravatar.cc/150?img=5',
+          maNguoiNhan: 'current_user',
+          tenNguoiNhan: 'Bạn',
+          anhNguoiNhan: 'https://i.pravatar.cc/150?img=50',
+          noiDung: 'Hãy chào JUNO.OKYO',
+          loai: 'text',
+          thoiGian: now.subtract(const Duration(hours: 6)),
+          daDoc: false,
+        ),
+      ];
+    } else if (cuocTroChuyenId.contains('user_chef_minh')) {
+      return [
+        TinNhan(
+          ma: '4',
+          maNguoiGui: 'user_chef_minh',
+          tenNguoiGui: 'Chef Minh',
+          anhNguoiGui: 'https://i.pravatar.cc/150?img=6',
+          maNguoiNhan: 'current_user',
+          tenNguoiNhan: 'Bạn',
+          anhNguoiNhan: 'https://i.pravatar.cc/150?img=50',
+          noiDung: 'Hãy chào Chef Minh',
+          loai: 'text',
+          thoiGian: now.subtract(const Duration(hours: 12)),
+          daDoc: false,
+        ),
+      ];
+    } else if (cuocTroChuyenId.contains('user_foodie_lan')) {
+      return [
+        TinNhan(
+          ma: '5',
+          maNguoiGui: 'user_foodie_lan',
+          tenNguoiGui: 'Foodie Lan',
+          anhNguoiGui: 'https://i.pravatar.cc/150?img=7',
+          maNguoiNhan: 'current_user',
+          tenNguoiNhan: 'Bạn',
+          anhNguoiNhan: 'https://i.pravatar.cc/150?img=50',
+          noiDung: 'Hãy chào Foodie Lan',
+          loai: 'text',
+          thoiGian: now.subtract(const Duration(days: 1, hours: 2)),
+          daDoc: false,
+        ),
+      ];
+    } else if (cuocTroChuyenId.contains('user_baker_anna')) {
+      return [
+        TinNhan(
+          ma: '6',
+          maNguoiGui: 'user_baker_anna',
+          tenNguoiGui: 'Baker Anna',
+          anhNguoiGui: 'https://i.pravatar.cc/150?img=8',
+          maNguoiNhan: 'current_user',
+          tenNguoiNhan: 'Bạn',
+          anhNguoiNhan: 'https://i.pravatar.cc/150?img=50',
+          noiDung: 'Hãy chào Baker Anna',
+          loai: 'text',
+          thoiGian: now.subtract(const Duration(days: 2, hours: 5)),
+          daDoc: false,
+        ),
+      ];
     }
 
-    // Sắp xếp theo thời gian
-    danhSach.sort((a, b) => a.thoiGian.compareTo(b.thoiGian));
-    
-    return danhSach;
+    // Mặc định trả về danh sách rỗng
+    return [];
   }
 
   // Đánh dấu đã đọc
   Future<void> danhDauDaDoc(String cuocTroChuyenId, String maNguoiDung) async {
-    await _db.child('cuoc_tro_chuyen').child(maNguoiDung).child(cuocTroChuyenId).update({
-      'soTinNhanChuaDoc': 0,
-    });
+    // Giả lập đánh dấu đã đọc
+    print('Đã đánh dấu đọc cuộc trò chuyện: $cuocTroChuyenId');
   }
 
   // Lắng nghe cuộc trò chuyện tóm tắt
-  Stream<List<CuocTroChuyenTomTat>> langNgheCuocTroChuyenTomTat(String maNguoiDung) {
-    return _db.child('cuoc_tro_chuyen').child(maNguoiDung).onValue.map((event) {
-      if (!event.snapshot.exists) return <CuocTroChuyenTomTat>[];
-
-      final List<CuocTroChuyenTomTat> danhSach = [];
-      
-      for (final child in event.snapshot.children) {
-        try {
-          final data = child.value as Map<dynamic, dynamic>?;
-          if (data == null) continue;
-
-          danhSach.add(CuocTroChuyenTomTat(
-            maNguoiKhac: data['maNguoiKhac'] ?? '',
-            tenNguoiKhac: data['tenNguoiKhac'] ?? '',
-            anhNguoiKhac: data['anhNguoiKhac'] ?? '',
-            tinNhanCuoi: data['tinNhanCuoi'] ?? '',
-            loaiTinNhanCuoi: data['loaiTinNhanCuoi'] ?? 'text',
-            thoiGianCuoi: DateTime.fromMillisecondsSinceEpoch(data['thoiGianCuoi'] ?? 0),
-            soTinNhanChuaDoc: data['soTinNhanChuaDoc'] ?? 0,
-            dangOnline: data['dangOnline'] ?? false,
-          ));
-        } catch (e) {
-          print('Lỗi khi chuyển đổi cuộc trò chuyện: $e');
-        }
-      }
-
-      // Sắp xếp theo thời gian mới nhất
-      danhSach.sort((a, b) => b.thoiGianCuoi.compareTo(a.thoiGianCuoi));
-      
-      return danhSach;
-    });
+  Stream<List<CuocTroChuyenTomTat>> langNgheCuocTroChuyenTomTat(
+      String maNguoiDung) {
+    // Trả về stream với dữ liệu mẫu
+    return Stream.value(_layDuLieuMau());
   }
 
   // Lắng nghe tin nhắn
   Stream<List<TinNhan>> langNgheTinNhan(String cuocTroChuyenId) {
-    return _db.child('tin_nhan').child(cuocTroChuyenId).onValue.map((event) {
-      if (!event.snapshot.exists) return <TinNhan>[];
-
-      final List<TinNhan> danhSach = [];
-      
-      for (final child in event.snapshot.children) {
-        try {
-          final data = child.value as Map<dynamic, dynamic>?;
-          if (data == null) continue;
-
-          danhSach.add(TinNhan.fromMap(Map<String, dynamic>.from(data)));
-        } catch (e) {
-          print('Lỗi khi chuyển đổi tin nhắn: $e');
-        }
-      }
-
-      // Sắp xếp theo thời gian
-      danhSach.sort((a, b) => a.thoiGian.compareTo(b.thoiGian));
-      
-      return danhSach;
-    });
+    // Trả về stream với tin nhắn mẫu
+    return Stream.value(_layTinNhanMau(cuocTroChuyenId));
   }
 
   // Lấy danh sách stories (giả lập)
   Future<List<Story>> layDanhSachStories() async {
-    // Giả lập dữ liệu stories
     return [
       Story(
         ma: '1',
-        maNguoiDung: 'user1',
+        maNguoiDung: 'current_user',
         tenNguoiDung: 'Bạn',
-        anhNguoiDung: 'assets/images/avatar_default.jpg',
-        urlHinhAnh: 'assets/images/story1.jpg',
+        anhNguoiDung: 'https://i.pravatar.cc/150?img=50',
+        urlHinhAnh: 'https://picsum.photos/400/600?random=1',
         thoiGian: DateTime.now().subtract(const Duration(hours: 2)),
         daXem: false,
       ),
-      Story(
-        ma: '2',
-        maNguoiDung: 'user2',
-        tenNguoiDung: 'Quay',
-        anhNguoiDung: 'assets/images/user1.jpg',
-        urlHinhAnh: 'assets/images/story2.jpg',
-        thoiGian: DateTime.now().subtract(const Duration(hours: 1)),
-        daXem: false,
-      ),
-      Story(
-        ma: '3',
-        maNguoiDung: 'user3',
-        tenNguoiDung: 'Ký niệm xưa',
-        anhNguoiDung: 'assets/images/user2.jpg',
-        urlHinhAnh: 'assets/images/story3.jpg',
-        thoiGian: DateTime.now().subtract(const Duration(minutes: 30)),
-        daXem: true,
-      ),
-      Story(
-        ma: '4',
-        maNguoiDung: 'user4',
-        tenNguoiDung: 'Anh Phi Có...',
-        anhNguoiDung: 'assets/images/user3.jpg',
-        urlHinhAnh: 'assets/images/story4.jpg',
-        thoiGian: DateTime.now().subtract(const Duration(minutes: 15)),
-        daXem: false,
-      ),
-      Story(
-        ma: '5',
-        maNguoiDung: 'user5',
-        tenNguoiDung: 'Dr Hưng Da...',
-        anhNguoiDung: 'assets/images/user4.jpg',
-        urlHinhAnh: 'assets/images/story5.jpg',
-        thoiGian: DateTime.now().subtract(const Duration(minutes: 5)),
-        daXem: false,
-      ),
     ];
+  }
+
+  // Lấy thông tin chi tiết người dùng
+  Map<String, dynamic> layThongTinNguoiDung(String maNguoiDung) {
+    final thongTinNguoiDung = {
+      'user_thihin': {
+        'username': '@thihin2004',
+        'following': 15,
+        'followers': 32,
+      },
+      'user_seto666': {
+        'username': '@ssvictor0',
+        'following': 9,
+        'followers': 16,
+      },
+      'user_juno': {
+        'username': '@juno_okyo',
+        'following': 1200,
+        'followers': 856,
+      },
+      'user_chef_minh': {
+        'username': '@chef_minh_official',
+        'following': 500,
+        'followers': 2500,
+      },
+      'user_foodie_lan': {
+        'username': '@foodie_lan_vn',
+        'following': 300,
+        'followers': 1200,
+      },
+      'user_baker_anna': {
+        'username': '@baker_anna_sweet',
+        'following': 150,
+        'followers': 800,
+      },
+    };
+
+    return thongTinNguoiDung[maNguoiDung] ??
+        {
+          'username': '@unknown',
+          'following': 0,
+          'followers': 0,
+        };
   }
 }

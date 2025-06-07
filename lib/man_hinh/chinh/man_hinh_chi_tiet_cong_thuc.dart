@@ -1,13 +1,9 @@
-import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:flutter/material.dart';
+import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/cong_thuc.dart';
 import 'package:do_an/mo_hinh/binh_luan.dart';
-import 'package:do_an/giao_dien/chu_de.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:do_an/man_hinh/chinh/man_hinh_ho_so_nguoi_dung.dart';
 
 class ManHinhChiTietCongThuc extends StatefulWidget {
   final CongThuc congThuc;
@@ -24,114 +20,83 @@ class ManHinhChiTietCongThuc extends StatefulWidget {
 class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final TextEditingController _binhLuanController = TextEditingController();
-  double _danhGia = 5.0;
-  bool _dangHienThiDanhGia = false;
-  bool _daLuuCongThuc = false;
+  bool _daThich = false;
+  bool _daLuu = false;
   final ScrollController _scrollController = ScrollController();
-  bool _hienThiAppBarMau = false;
+  bool _hienThiAppBar = false;
+
+  final List<BinhLuan> _danhSachBinhLuan = [
+    BinhLuan(
+      ma: '1',
+      noiDung: 'Món này rất ngon, tôi đã làm thử và cả nhà đều thích!',
+      thoiGian: DateTime.now().subtract(const Duration(days: 2)),
+      tenNguoiDung: 'Nguyễn Văn A',
+      anhDaiDien: 'assets/images/avatar1.jpg',
+    ),
+    BinhLuan(
+      ma: '2',
+      noiDung: 'Cảm ơn bạn đã chia sẻ công thức tuyệt vời này.',
+      thoiGian: DateTime.now().subtract(const Duration(hours: 5)),
+      tenNguoiDung: 'Trần Thị B',
+      anhDaiDien: 'assets/images/avatar2.jpg',
+    ),
+    BinhLuan(
+      ma: '3',
+      noiDung: 'Tôi thấy nên thêm một chút tiêu để món ăn đậm đà hơn.',
+      thoiGian: DateTime.now().subtract(const Duration(minutes: 30)),
+      tenNguoiDung: 'Lê Văn C',
+      anhDaiDien: 'assets/images/avatar3.jpg',
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels > 200 && !_hienThiAppBarMau) {
-        setState(() {
-          _hienThiAppBarMau = true;
-        });
-      } else if (_scrollController.position.pixels <= 200 &&
-          _hienThiAppBarMau) {
-        setState(() {
-          _hienThiAppBarMau = false;
-        });
-      }
-    });
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _binhLuanController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _guiBinhLuan() {
-    if (_binhLuanController.text.isNotEmpty) {
-      final dangNhapService = Provider.of<DangKiDangNhapEmail>(context);
-      final nguoiDung = dangNhapService.nguoiDungHienTai;
-
-      final binhLuanMoi = BinhLuan(
-        ma: DateTime.now().millisecondsSinceEpoch.toString(),
-        noiDung: _binhLuanController.text,
-        thoiGian: DateTime.now(),
-        tacGia: nguoiDung?.hoTen ?? 'Người dùng ẩn danh',
-        anhTacGia: nguoiDung?.anhDaiDien ?? 'assets/images/avatar.jpg',
-      );
-
-      // dichVuDuLieu.themBinhLuan(widget.congThuc.ma, binhLuanMoi);
-      _binhLuanController.clear();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Bình luận của bạn đã được gửi!'),
-          backgroundColor: ChuDe.mauXanhLa,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+  void _onScroll() {
+    if (_scrollController.offset > 200 && !_hienThiAppBar) {
+      setState(() {
+        _hienThiAppBar = true;
+      });
+    } else if (_scrollController.offset <= 200 && _hienThiAppBar) {
+      setState(() {
+        _hienThiAppBar = false;
+      });
     }
   }
 
-  void _guiDanhGia() {
-    // final dichVuDuLieu = Provider.of<DichVuDuLieu>(context, listen: false);
-    // dichVuDuLieu.danhGiaCongThuc(widget.congThuc.ma, _danhGia);
-
+  void _toggleThich() {
     setState(() {
-      _dangHienThiDanhGia = false;
+      _daThich = !_daThich;
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Cảm ơn bạn đã đánh giá công thức!'),
-        backgroundColor: ChuDe.mauXanhLa,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
-  void _luuCongThuc() {
+  void _toggleLuu() {
     setState(() {
-      _daLuuCongThuc = !_daLuuCongThuc;
+      _daLuu = !_daLuu;
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content:
-            Text(_daLuuCongThuc ? 'Đã lưu công thức' : 'Đã bỏ lưu công thức'),
-        backgroundColor: _daLuuCongThuc ? ChuDe.mauXanhLa : ChuDe.mauChuPhu,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
-  void _chiaSeCongThuc() {
-    Share.share(
-      'Hãy thử làm món ${widget.congThuc.tenMon} ngon tuyệt này! Xem công thức tại: https://amthucviet.app/cong-thuc/${widget.congThuc.ma}',
-      subject: 'Chia sẻ công thức ${widget.congThuc.tenMon}',
+  void _moHoSoNguoiDung() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManHinhHoSoNguoiDung(
+          maNguoiDung: 'user_${widget.congThuc.tacGia.toLowerCase().replaceAll(' ', '_')}',
+          tenNguoiDung: widget.congThuc.tacGia,
+          anhDaiDien: widget.congThuc.anhTacGia,
+        ),
+      ),
     );
   }
 
@@ -144,70 +109,121 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
           return [
             SliverAppBar(
               expandedHeight: 300,
+              floating: false,
               pinned: true,
-              backgroundColor:
-                  _hienThiAppBarMau ? ChuDe.mauChinh : Colors.transparent,
+              backgroundColor: _hienThiAppBar ? ChuDe.mauChinh : Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.arrow_back, color: Colors.white),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
+                IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _daLuu ? Icons.bookmark : Icons.bookmark_border,
+                      color: Colors.white,
+                    ),
+                  ),
+                  onPressed: _toggleLuu,
+                ),
+                IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.share, color: Colors.white),
+                  ),
+                  onPressed: () {},
+                ),
+              ],
               flexibleSpace: FlexibleSpaceBar(
-                background: Hero(
-                  tag: 'recipe_image_${widget.congThuc.ma}',
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.asset(
-                        widget.congThuc.hinhAnh,
-                        fit: BoxFit.cover,
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withAlpha(180),
-                            ],
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Hình ảnh món ăn
+                    widget.congThuc.hinhAnh.startsWith('http')
+                        ? Image.network(
+                            widget.congThuc.hinhAnh,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.asset(
+                            widget.congThuc.hinhAnh,
+                            fit: BoxFit.cover,
                           ),
+                    // Gradient overlay
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
                         ),
                       ),
-                      Positioned(
-                        bottom: 16,
-                        left: 16,
-                        right: 16,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: ChuDe.mauChinh,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                widget.congThuc.loai,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                    ),
+                    // Thông tin món ăn
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Loại món
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: ChuDe.mauChinh,
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              widget.congThuc.tenMon,
+                            child: Text(
+                              widget.congThuc.loai,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 24,
                                 fontWeight: FontWeight.bold,
+                                fontSize: 12,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Row(
+                          ),
+                          const SizedBox(height: 8),
+                          // Tên món
+                          Text(
+                            widget.congThuc.tenMon,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Thông tin tác giả
+                          GestureDetector(
+                            onTap: _moHoSoNguoiDung,
+                            child: Row(
                               children: [
                                 CircleAvatar(
                                   radius: 16,
-                                  backgroundImage:
-                                      AssetImage(widget.congThuc.anhTacGia),
+                                  backgroundImage: widget.congThuc.anhTacGia.startsWith('http')
+                                      ? NetworkImage(widget.congThuc.anhTacGia)
+                                      : AssetImage(widget.congThuc.anhTacGia) as ImageProvider,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
@@ -215,29 +231,30 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 14,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                                 const Spacer(),
+                                // Đánh giá
                                 Row(
                                   children: [
                                     const Icon(
                                       Icons.star,
                                       color: Colors.amber,
-                                      size: 16,
+                                      size: 20,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      widget.congThuc.diemDanhGia
-                                          .toStringAsFixed(1),
+                                      widget.congThuc.diemDanhGia.toStringAsFixed(1),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 14,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '(${widget.congThuc.danhSachDanhGia.length})',
+                                      '(${widget.congThuc.luotDanhGia})',
                                       style: const TextStyle(
                                         color: Colors.white70,
                                         fontSize: 12,
@@ -247,113 +264,44 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                title: _hienThiAppBarMau
-                    ? Text(
-                        widget.congThuc.tenMon,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
-              ),
-              leading: IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _hienThiAppBarMau ? Colors.white24 : Colors.black26,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_back,
-                    color: _hienThiAppBarMau ? Colors.white : Colors.white,
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              ),
-              actions: [
-                IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color:
-                          _hienThiAppBarMau ? Colors.white24 : Colors.black26,
-                      shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      _daLuuCongThuc ? Icons.bookmark : Icons.bookmark_border,
-                      color: _hienThiAppBarMau ? Colors.white : Colors.white,
-                    ),
-                  ),
-                  onPressed: _luuCongThuc,
-                ),
-                IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color:
-                          _hienThiAppBarMau ? Colors.white24 : Colors.black26,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.share,
-                      color: _hienThiAppBarMau ? Colors.white : Colors.white,
-                    ),
-                  ),
-                  onPressed: _chiaSeCongThuc,
-                ),
-              ],
-            ),
-            SliverPersistentHeader(
-              delegate: _SliverAppBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  labelColor: ChuDe.mauChinh,
-                  unselectedLabelColor: ChuDe.mauChuPhu,
-                  indicatorColor: ChuDe.mauChinh,
-                  indicatorWeight: 3,
-                  tabs: const [
-                    Tab(text: 'Công Thức'),
-                    Tab(text: 'Nguyên Liệu'),
-                    Tab(text: 'Bình Luận'),
                   ],
                 ),
               ),
-              pinned: true,
+              bottom: TabBar(
+                controller: _tabController,
+                labelColor: _hienThiAppBar ? Colors.white : ChuDe.mauChinh,
+                unselectedLabelColor:
+                    _hienThiAppBar ? Colors.white70 : ChuDe.mauChuPhu,
+                indicatorColor: _hienThiAppBar ? Colors.white : ChuDe.mauChinh,
+                tabs: const [
+                  Tab(text: 'Công Thức'),
+                  Tab(text: 'Nguyên Liệu'),
+                  Tab(text: 'Bình Luận'),
+                ],
+              ),
             ),
           ];
         },
         body: TabBarView(
           controller: _tabController,
           children: [
-            // Tab Công Thức
             _xayDungTabCongThuc(),
-
-            // Tab Nguyên Liệu
             _xayDungTabNguyenLieu(),
-
-            // Tab Bình Luận
             _xayDungTabBinhLuan(),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            _dangHienThiDanhGia = true;
-          });
-        },
-        backgroundColor: ChuDe.mauChinh,
-        child: const Icon(Icons.star),
+        onPressed: _toggleThich,
+        backgroundColor: _daThich ? ChuDe.mauChinh : Colors.white,
+        child: Icon(
+          _daThich ? Icons.favorite : Icons.favorite_border,
+          color: _daThich ? Colors.white : ChuDe.mauChinh,
+        ),
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
@@ -361,124 +309,40 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 4,
-              offset: const Offset(0, -2),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
             ),
           ],
         ),
-        child: ElevatedButton.icon(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: ChuDe.mauChinh,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        child: SafeArea(
+          child: ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChuDe.mauChinh,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-          ),
-          icon: const Icon(Icons.restaurant_menu),
-          label: const Text(
-            'Bắt Đầu Nấu Ăn',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.restaurant_menu),
+                const SizedBox(width: 8),
+                const Text(
+                  'Bắt Đầu Nấu Ăn',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ),
-      // Hiển thị đánh giá
-      bottomSheet: _dangHienThiDanhGia
-          ? Container(
-              color: Colors.black.withAlpha(150),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const Text(
-                      'Đánh Giá Công Thức',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.congThuc.tenMon,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: ChuDe.mauChuPhu,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    RatingBar.builder(
-                      initialRating: _danhGia,
-                      minRating: 1,
-                      direction: Axis.horizontal,
-                      allowHalfRating: true,
-                      itemCount: 5,
-                      itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
-                      itemBuilder: (context, _) => const Icon(
-                        Icons.star,
-                        color: Colors.amber,
-                      ),
-                      onRatingUpdate: (rating) {
-                        setState(() {
-                          _danhGia = rating;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _dangHienThiDanhGia = false;
-                            });
-                          },
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                          ),
-                          child: const Text('Hủy'),
-                        ),
-                        ElevatedButton(
-                          onPressed: _guiDanhGia,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: ChuDe.mauChinh,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text('Gửi Đánh Giá'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : null,
     );
   }
 
@@ -488,7 +352,7 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Thông tin công thức
+          // Thông tin cơ bản
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -496,7 +360,7 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(10),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -505,28 +369,28 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _xayDungThongTinCongThuc(
-                  icon: Icons.access_time,
-                  label: 'Thời gian',
-                  value: '${widget.congThuc.thoiGianNau} phút',
+                _xayDungThongTinCoBan(
+                  Icons.access_time,
+                  'Thời gian',
+                  '${widget.congThuc.thoiGianNau} phút',
                 ),
-                _xayDungThongTinCongThuc(
-                  icon: Icons.restaurant,
-                  label: 'Khẩu phần',
-                  value: '${widget.congThuc.khauPhan} người',
+                _xayDungThongTinCoBan(
+                  Icons.people,
+                  'Khẩu phần',
+                  '${widget.congThuc.khauPhan} người',
                 ),
-                _xayDungThongTinCongThuc(
-                  icon: Icons.local_fire_department,
-                  label: 'Độ khó',
-                  value: 'Trung bình',
+                _xayDungThongTinCoBan(
+                  Icons.local_fire_department,
+                  'Độ khó',
+                  widget.congThuc.doKho,
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 500.ms),
+          ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.3, end: 0),
 
           const SizedBox(height: 24),
 
-          // Hướng dẫn
+          // Hướng dẫn nấu ăn
           const Text(
             'Hướng Dẫn',
             style: TextStyle(
@@ -537,116 +401,80 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
 
           const SizedBox(height: 16),
 
-          ...widget.congThuc.cachLam.asMap().entries.map((entry) {
-            final index = entry.key;
-            final buoc = entry.value;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(5),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: ChuDe.mauChinh,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      buoc,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ],
-              ),
-            )
-                .animate()
-                .fadeIn(duration: 500.ms, delay: 400.ms + (index * 100).ms);
-          }),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: widget.congThuc.cacBuoc.length,
+            itemBuilder: (context, index) {
+              return _xayDungBuocNau(
+                index + 1,
+                widget.congThuc.cacBuoc[index],
+              ).animate().fadeIn(
+                    duration: 500.ms,
+                    delay: Duration(milliseconds: 300 + (index * 100)),
+                  );
+            },
+          ),
 
           const SizedBox(height: 24),
 
           // Mẹo nấu ăn
+          const Text(
+            'Mẹo Nấu Ăn',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ).animate().fadeIn(duration: 500.ms, delay: 800.ms),
+
+          const SizedBox(height: 16),
+
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ChuDe.mauPhu,
+              color: ChuDe.mauPhu.withOpacity(0.1),
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: ChuDe.mauPhu),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.lightbulb,
                       color: ChuDe.mauChinh,
                     ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Mẹo Nấu Ăn',
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Lời khuyên từ đầu bếp',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: ChuDe.mauChinh,
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
-                  '• Nên ninh xương trong nước lạnh để nước dùng trong hơn.',
-                  style: TextStyle(fontSize: 14),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Nướng hành và gừng trước khi cho vào nồi sẽ giúp nước dùng thơm hơn.',
-                  style: TextStyle(fontSize: 14),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Thịt bò nên thái mỏng và để đông lạnh trước khi thái để dễ thái hơn.',
-                  style: TextStyle(fontSize: 14),
+                  widget.congThuc.meoNauAn,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 500.ms, delay: 600.ms),
+          ).animate().fadeIn(duration: 500.ms, delay: 900.ms),
 
-          const SizedBox(height: 80), // Để tránh bị che bởi nút bắt đầu nấu ăn
+          const SizedBox(height: 80), // Để không bị che bởi FAB
         ],
       ),
     );
   }
 
-  Widget _xayDungThongTinCongThuc({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+  Widget _xayDungThongTinCoBan(IconData icon, String label, String value) {
     return Column(
       children: [
         Icon(
@@ -674,13 +502,51 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
     );
   }
 
+  Widget _xayDungBuocNau(int buoc, String moTa) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: ChuDe.mauChinh,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                buoc.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              moTa,
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _xayDungTabNguyenLieu() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Số lượng khẩu phần
+          // Danh sách nguyên liệu
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -688,72 +554,51 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(10),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Khẩu Phần:',
+                  'Nguyên Liệu',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: ChuDe.mauChuPhu),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove),
-                        onPressed: () {},
-                        iconSize: 16,
-                      ),
-                      Text(
-                        '${widget.congThuc.khauPhan}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: () {},
-                        iconSize: 16,
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Đặt lại'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: ChuDe.mauChinh,
-                  ),
+                const SizedBox(height: 16),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: widget.congThuc.nguyenLieu.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    return _xayDungNguyenLieu(
+                      widget.congThuc.nguyenLieu[index],
+                    ).animate().fadeIn(
+                          duration: 500.ms,
+                          delay: Duration(milliseconds: 200 + (index * 100)),
+                        );
+                  },
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 500.ms),
+          ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.3, end: 0),
 
           const SizedBox(height: 24),
 
-          // Danh sách nguyên liệu
+          // Ghi chú
           const Text(
-            'Nguyên Liệu',
+            'Ghi Chú',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
-          ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
+          ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
 
           const SizedBox(height: 16),
 
@@ -764,305 +609,402 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(10),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
               ],
             ),
             child: Column(
-              children: widget.congThuc.nguyenLieu.asMap().entries.map((entry) {
-                final nguyenLieu = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: ChuDe.mauChinh,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          nguyenLieu,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      Checkbox(
-                        value: false,
-                        onChanged: (value) {},
-                        activeColor: ChuDe.mauChinh,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ],
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Bạn có thể thay thế một số nguyên liệu nếu không có sẵn:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                   ),
-                );
-              }).toList(),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.congThuc.ghiChu,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ],
             ),
-          ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
+          ).animate().fadeIn(duration: 500.ms, delay: 500.ms),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 80), // Để không bị che bởi FAB
+        ],
+      ),
+    );
+  }
 
-          // Nút thêm vào danh sách mua sắm
-          ElevatedButton.icon(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ChuDe.mauXanhLa,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+  Widget _xayDungNguyenLieu(String nguyenLieu) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: ChuDe.mauPhu,
+              borderRadius: BorderRadius.circular(6),
             ),
-            icon: const Icon(Icons.shopping_cart),
-            label: const Text(
-              'Thêm Vào Danh Sách Mua Sắm',
-              style: TextStyle(
+            child: const Icon(
+              Icons.check,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              nguyenLieu,
+              style: const TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
               ),
             ),
-          ).animate().fadeIn(duration: 500.ms, delay: 600.ms),
-
-          const SizedBox(height: 80), // Để tránh bị che bởi nút bắt đầu nấu ăn
+          ),
         ],
       ),
     );
   }
 
   Widget _xayDungTabBinhLuan() {
-    return Column(
-      children: [
-        Expanded(
-          child: widget.congThuc.danhSachBinhLuan.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.chat_bubble_outline,
-                        size: 64,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Đánh giá tổng quan
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Column(
+                  children: [
+                    Text(
+                      widget.congThuc.diemDanhGia.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: ChuDe.mauChinh,
+                      ),
+                    ),
+                    Row(
+                      children: List.generate(5, (index) {
+                        return Icon(
+                          index < widget.congThuc.diemDanhGia.floor()
+                              ? Icons.star
+                              : index < widget.congThuc.diemDanhGia
+                                  ? Icons.star_half
+                                  : Icons.star_border,
+                          color: Colors.amber,
+                          size: 16,
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${widget.congThuc.luotDanhGia} đánh giá',
+                      style: const TextStyle(
+                        fontSize: 12,
                         color: ChuDe.mauChuPhu,
                       ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Chưa có bình luận nào',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: ChuDe.mauChuPhu,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Hãy là người đầu tiên bình luận về công thức này',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: ChuDe.mauChuPhu,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // Focus vào ô nhập bình luận
-                          FocusScope.of(context).requestFocus(FocusNode());
-                          // Delay để đảm bảo keyboard hiển thị
-                          Future.delayed(const Duration(milliseconds: 100), () {
-                            if (mounted) {
-                              FocusScope.of(context).requestFocus(FocusNode());
-                            }
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ChuDe.mauChinh,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(Icons.chat),
-                        label: const Text('Viết bình luận'),
-                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _xayDungThanhDanhGia(5, 0.7),
+                      _xayDungThanhDanhGia(4, 0.2),
+                      _xayDungThanhDanhGia(3, 0.05),
+                      _xayDungThanhDanhGia(2, 0.03),
+                      _xayDungThanhDanhGia(1, 0.02),
                     ],
                   ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: widget.congThuc.danhSachBinhLuan.length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final binhLuan = widget.congThuc.danhSachBinhLuan[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundImage: AssetImage(binhLuan.anhTacGia),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      binhLuan.tacGia,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      DateFormat('dd/MM/yyyy')
-                                          .format(binhLuan.thoiGian),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: ChuDe.mauChuPhu,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(binhLuan.noiDung),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    TextButton.icon(
-                                      onPressed: () {},
-                                      icon: const Icon(Icons.thumb_up_outlined,
-                                          size: 16),
-                                      label: const Text('Thích'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: ChuDe.mauChuPhu,
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(0, 0),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        textStyle:
-                                            const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    TextButton.icon(
-                                      onPressed: () {},
-                                      icon: const Icon(Icons.reply, size: 16),
-                                      label: const Text('Trả lời'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: ChuDe.mauChuPhu,
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(0, 0),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        textStyle:
-                                            const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(
-                        duration: 500.ms, delay: 300.ms + (index * 100).ms);
-                  },
                 ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(10),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
-              ),
-            ],
+              ],
+            ),
+          ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.3, end: 0),
+
+          const SizedBox(height: 24),
+
+          // Form bình luận
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Viết Đánh Giá',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: const Icon(Icons.star_border),
+                      color: Colors.amber,
+                      onPressed: () {},
+                    );
+                  }),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Chia sẻ trải nghiệm của bạn...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ChuDe.mauChinh,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Gửi Đánh Giá'),
+                  ),
+                ),
+              ],
+            ),
+          ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
+
+          const SizedBox(height: 24),
+
+          // Danh sách bình luận
+          const Text(
+            'Bình Luận',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
+
+          const SizedBox(height: 16),
+
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _danhSachBinhLuan.length,
+            itemBuilder: (context, index) {
+              return _xayDungBinhLuan(_danhSachBinhLuan[index])
+                  .animate()
+                  .fadeIn(
+                    duration: 500.ms,
+                    delay: Duration(milliseconds: 500 + (index * 100)),
+                  );
+            },
           ),
-          child: Row(
+
+          const SizedBox(height: 80), // Để không bị che bởi FAB
+        ],
+      ),
+    );
+  }
+
+  Widget _xayDungThanhDanhGia(int sao, double tiLe) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Text(
+            '$sao',
+            style: const TextStyle(
+              fontSize: 12,
+              color: ChuDe.mauChuPhu,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.star,
+            color: Colors.amber,
+            size: 12,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Stack(
+              children: [
+                Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: tiLe,
+                  child: Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: ChuDe.mauChinh,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${(tiLe * 100).toInt()}%',
+            style: const TextStyle(
+              fontSize: 12,
+              color: ChuDe.mauChuPhu,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _xayDungBinhLuan(BinhLuan binhLuan) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               CircleAvatar(
-                radius: 20,
-                backgroundImage: AssetImage(
-                  Provider.of<DangKiDangNhapEmail>(context)
-                          .nguoiDungHienTai
-                          ?.anhDaiDien ??
-                      'assets/images/avatar.jpg',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _binhLuanController,
-                  decoration: InputDecoration(
-                    hintText: 'Viết bình luận...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                  ),
-                  maxLines: null,
-                ),
+                radius: 16,
+                backgroundImage: AssetImage(binhLuan.anhDaiDien),
               ),
               const SizedBox(width: 8),
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: ChuDe.mauChinh,
-                child: IconButton(
-                  onPressed: _guiBinhLuan,
-                  icon: const Icon(Icons.send, size: 18),
-                  color: Colors.white,
+              Text(
+                binhLuan.tenNguoiDung,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                _formatThoiGian(binhLuan.thoiGian),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ChuDe.mauChuPhu,
                 ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Text(
+            binhLuan.noiDung,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.thumb_up_outlined),
+                iconSize: 16,
+                color: ChuDe.mauChuPhu,
+                onPressed: () {},
+              ),
+              const Text(
+                '12',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ChuDe.mauChuPhu,
+                ),
+              ),
+              const SizedBox(width: 16),
+              IconButton(
+                icon: const Icon(Icons.thumb_down_outlined),
+                iconSize: 16,
+                color: ChuDe.mauChuPhu,
+                onPressed: () {},
+              ),
+              const Text(
+                '2',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ChuDe.mauChuPhu,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {},
+                child: const Text('Trả lời'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
-}
 
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
+  String _formatThoiGian(DateTime thoiGian) {
+    final now = DateTime.now();
+    final difference = now.difference(thoiGian);
 
-  _SliverAppBarDelegate(this.tabBar);
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.white,
-      child: tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
+    if (difference.inDays > 0) {
+      return '${difference.inDays} ngày trước';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} giờ trước';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} phút trước';
+    } else {
+      return 'Vừa xong';
+    }
   }
 }
