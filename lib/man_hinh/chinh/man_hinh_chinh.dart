@@ -15,7 +15,7 @@ class ManHinhChinh extends StatefulWidget {
 
 class _ManHinhChinhState extends State<ManHinhChinh> {
   int _chiSoHienTai = 0;
-  
+
   late List<Widget> _manHinh;
 
   @override
@@ -92,9 +92,9 @@ class _ManHinhChinhState extends State<ManHinhChinh> {
               label: 'Thêm',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.message_outlined), 
+              icon: Icon(Icons.message_outlined),
               activeIcon: Icon(Icons.message),
-              label: 'Hộp Thư', 
+              label: 'Hộp Thư',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

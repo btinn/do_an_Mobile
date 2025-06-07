@@ -43,14 +43,19 @@ class DichVuTinNhan {
     };
 
     // Lưu tin nhắn
-    await _db.child('tin_nhan').child(cuocTroChuyenId).child(tinNhanId).set(tinNhan);
+    await _db
+        .child('tin_nhan')
+        .child(cuocTroChuyenId)
+        .child(tinNhanId)
+        .set(tinNhan);
 
     // Cập nhật cuộc trò chuyện tóm tắt
     await _capNhatCuocTroChuyenTomTat(cuocTroChuyenId, tinNhan);
   }
 
   // Cập nhật cuộc trò chuyện tóm tắt
-  Future<void> _capNhatCuocTroChuyenTomTat(String cuocTroChuyenId, Map<String, dynamic> tinNhan) async {
+  Future<void> _capNhatCuocTroChuyenTomTat(
+      String cuocTroChuyenId, Map<String, dynamic> tinNhan) async {
     final cuocTroChuyenTomTat = {
       'tinNhanCuoi': tinNhan['noiDung'],
       'loaiTinNhanCuoi': tinNhan['loai'],
@@ -59,7 +64,11 @@ class DichVuTinNhan {
     };
 
     // Cập nhật cho người gửi
-    await _db.child('cuoc_tro_chuyen').child(tinNhan['maNguoiGui']).child(cuocTroChuyenId).update({
+    await _db
+        .child('cuoc_tro_chuyen')
+        .child(tinNhan['maNguoiGui'])
+        .child(cuocTroChuyenId)
+        .update({
       ...cuocTroChuyenTomTat,
       'maNguoiKhac': tinNhan['maNguoiNhan'],
       'tenNguoiKhac': tinNhan['tenNguoiNhan'],
@@ -67,7 +76,11 @@ class DichVuTinNhan {
     });
 
     // Cập nhật cho người nhận
-    await _db.child('cuoc_tro_chuyen').child(tinNhan['maNguoiNhan']).child(cuocTroChuyenId).update({
+    await _db
+        .child('cuoc_tro_chuyen')
+        .child(tinNhan['maNguoiNhan'])
+        .child(cuocTroChuyenId)
+        .update({
       ...cuocTroChuyenTomTat,
       'maNguoiKhac': tinNhan['maNguoiGui'],
       'tenNguoiKhac': tinNhan['tenNguoiGui'],
@@ -79,10 +92,20 @@ class DichVuTinNhan {
   }
 
   // Tăng số tin nhắn chưa đọc
-  Future<void> _tangSoTinNhanChuaDoc(String maNguoiDung, String cuocTroChuyenId) async {
-    final snapshot = await _db.child('cuoc_tro_chuyen').child(maNguoiDung).child(cuocTroChuyenId).child('soTinNhanChuaDoc').get();
+  Future<void> _tangSoTinNhanChuaDoc(
+      String maNguoiDung, String cuocTroChuyenId) async {
+    final snapshot = await _db
+        .child('cuoc_tro_chuyen')
+        .child(maNguoiDung)
+        .child(cuocTroChuyenId)
+        .child('soTinNhanChuaDoc')
+        .get();
     final soHienTai = snapshot.exists ? (snapshot.value as int? ?? 0) : 0;
-    await _db.child('cuoc_tro_chuyen').child(maNguoiDung).child(cuocTroChuyenId).update({
+    await _db
+        .child('cuoc_tro_chuyen')
+        .child(maNguoiDung)
+        .child(cuocTroChuyenId)
+        .update({
       'soTinNhanChuaDoc': soHienTai + 1,
     });
   }

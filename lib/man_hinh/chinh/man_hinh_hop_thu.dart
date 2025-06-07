@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/tin_nhan.dart';
 import 'package:do_an/dich_vu/dich_vu_tin_nhan.dart';
-import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_tin_nhan.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class ManHinhHopThu extends StatefulWidget {
@@ -14,47 +13,65 @@ class ManHinhHopThu extends StatefulWidget {
   State<ManHinhHopThu> createState() => _ManHinhHopThuState();
 }
 
-class _ManHinhHopThuState extends State<ManHinhHopThu> {
+class _ManHinhHopThuState extends State<ManHinhHopThu>
+    with TickerProviderStateMixin {
+  late AnimationController _searchController;
+  late AnimationController _fabController;
+
   final DichVuTinNhan _dichVuTinNhan = DichVuTinNhan();
+  final TextEditingController _searchController2 = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
   List<CuocTroChuyenTomTat> _danhSachCuocTroChuyenTomTat = [];
-  List<Story> _danhSachStories = [];
+  List<CuocTroChuyenTomTat> _danhSachTimKiem = [];
+
   bool _dangTai = false;
+  bool _dangTimKiem = false;
+  bool _hienThiTimKiem = false;
 
   @override
   void initState() {
     super.initState();
+    _searchController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fabController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
     _taiDuLieu();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _fabController.dispose();
+    _searchController2.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.offset > 100) {
+      _fabController.forward();
+    } else {
+      _fabController.reverse();
+    }
   }
 
   Future<void> _taiDuLieu() async {
     setState(() => _dangTai = true);
-    
+
     try {
-      // Tải stories
-      final stories = await _dichVuTinNhan.layDanhSachStories();
+      final danhSachCuocTroChuyenTomTat =
+          await _dichVuTinNhan.layDanhSachCuocTroChuyenTomTat('current_user');
+
       setState(() {
-        _danhSachStories = stories;
+        _danhSachCuocTroChuyenTomTat = danhSachCuocTroChuyenTomTat;
       });
-
-      // Tải cuộc trò chuyện
-      final dangNhapService = Provider.of<DangKiDangNhapEmail>(context, listen: false);
-      final nguoiDung = dangNhapService.nguoiDungHienTai;
-      
-      if (nguoiDung != null) {
-        final danhSach = await _dichVuTinNhan.layDanhSachCuocTroChuyenTomTat(nguoiDung.ma);
-        setState(() {
-          _danhSachCuocTroChuyenTomTat = danhSach;
-        });
-
-        // Lắng nghe cập nhật real-time
-        _dichVuTinNhan.langNgheCuocTroChuyenTomTat(nguoiDung.ma).listen((danhSach) {
-          if (mounted) {
-            setState(() {
-              _danhSachCuocTroChuyenTomTat = danhSach;
-            });
-          }
-        });
-      }
     } catch (e) {
       debugPrint('Lỗi tải dữ liệu: $e');
     } finally {
@@ -62,317 +79,455 @@ class _ManHinhHopThuState extends State<ManHinhHopThu> {
     }
   }
 
+  void _timKiem(String query) {
+    setState(() {
+      _dangTimKiem = true;
+    });
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (query.isEmpty) {
+        setState(() {
+          _danhSachTimKiem = [];
+          _dangTimKiem = false;
+        });
+        return;
+      }
+
+      final ketQua = _danhSachCuocTroChuyenTomTat.where((cuocTroChuyenTomTat) {
+        return cuocTroChuyenTomTat.tenNguoiKhac
+                .toLowerCase()
+                .contains(query.toLowerCase()) ||
+            cuocTroChuyenTomTat.tinNhanCuoi
+                .toLowerCase()
+                .contains(query.toLowerCase());
+      }).toList();
+
+      setState(() {
+        _danhSachTimKiem = ketQua;
+        _dangTimKiem = false;
+      });
+    });
+  }
+
+  void _toggleTimKiem() {
+    setState(() {
+      _hienThiTimKiem = !_hienThiTimKiem;
+    });
+
+    if (_hienThiTimKiem) {
+      _searchController.forward();
+    } else {
+      _searchController.reverse();
+      _searchController2.clear();
+      _danhSachTimKiem.clear();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            const Icon(Icons.people_outline, color: ChuDe.mauChu),
-            const SizedBox(width: 8),
-            const Text(
-              'Hộp thư',
-              style: TextStyle(
-                color: ChuDe.mauChu,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: ChuDe.mauChu),
-            onPressed: () {
-              // Tìm kiếm
-            },
+      backgroundColor: ChuDe.mauNenTinNhan,
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          _xayDungSliverAppBar(),
+          SliverToBoxAdapter(
+            child: _xayDungTabTinNhan(),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _taiDuLieu,
-        child: CustomScrollView(
-          slivers: [
-            // Stories Section
-            SliverToBoxAdapter(
-              child: Container(
-                height: 100,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _danhSachStories.length,
-                  itemBuilder: (context, index) {
-                    final story = _danhSachStories[index];
-                    return _xayDungStoryItem(story, index == 0);
-                  },
-                ),
-              ),
-            ),
-
-            // Divider
-            const SliverToBoxAdapter(
-              child: Divider(height: 1, thickness: 0.5),
-            ),
-
-            // Chat List
-            if (_dangTai)
-              const SliverToBoxAdapter(
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(color: ChuDe.mauChinh),
-                  ),
-                ),
-              )
-            else if (_danhSachCuocTroChuyenTomTat.isEmpty)
-              SliverFillRemaining(
-                child: _xayDungManHinhTrong(),
-              )
-            else
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == 0) {
-                      return _xayDungItemHeThong();
-                    }
-                    final cuocTroChuyenIndex = index - 1;
-                    if (cuocTroChuyenIndex < _danhSachCuocTroChuyenTomTat.length) {
-                      final cuocTroChuyenTomTat = _danhSachCuocTroChuyenTomTat[cuocTroChuyenIndex];
-                      return _xayDungItemCuocTroChuyenTomTat(cuocTroChuyenTomTat);
-                    }
-                    return const SizedBox.shrink();
-                  },
-                  childCount: _danhSachCuocTroChuyenTomTat.length + 1,
-                ),
-              ),
-          ],
+      floatingActionButton: ScaleTransition(
+        scale: Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(parent: _fabController, curve: Curves.elasticOut),
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: _hienThiDialogTaoTinNhanMoi,
+          backgroundColor: ChuDe.mauTinNhanGui,
+          foregroundColor: Colors.white,
+          elevation: 8,
+          icon: const Icon(Icons.edit_rounded),
+          label: const Text(
+            'Tin nhắn mới',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
         ),
       ),
     );
   }
 
-  Widget _xayDungStoryItem(Story story, bool isMyStory) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: GestureDetector(
-        onTap: () {
-          // Xem story
-        },
-        child: Column(
-          children: [
-            Stack(
+  Widget _xayDungSliverAppBar() {
+    return SliverAppBar(
+      expandedHeight: _hienThiTimKiem ? 120 : 80,
+      floating: true,
+      pinned: true,
+      snap: true,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      systemOverlayStyle: SystemUiOverlayStyle.dark,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.white, ChuDe.mauNenTinNhan],
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: story.daXem
-                        ? null
-                        : const LinearGradient(
-                            colors: [Colors.purple, Colors.pink, Colors.orange],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                    border: story.daXem
-                        ? Border.all(color: Colors.grey.shade300, width: 2)
-                        : null,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: CircleAvatar(
-                      radius: 28,
-                      backgroundImage: story.anhNguoiDung.startsWith('http')
-                          ? NetworkImage(story.anhNguoiDung)
-                          : AssetImage(story.anhNguoiDung) as ImageProvider,
-                    ),
-                  ),
-                ),
-                if (isMyStory)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: ChuDe.mauChinh,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 12,
-                      ),
-                    ),
-                  ),
+                _xayDungHeader(),
+                if (_hienThiTimKiem) _xayDungTimKiem(),
               ],
             ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: 60,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _xayDungHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Tin Nhắn',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: ChuDe.mauChu,
+              ),
+            ),
+          ),
+          _xayDungNutHanhDong(
+            icon: Icons.search_rounded,
+            onTap: _toggleTimKiem,
+            isActive: _hienThiTimKiem,
+          ),
+          const SizedBox(width: 12),
+          _xayDungNutHanhDong(
+            icon: Icons.more_vert_rounded,
+            onTap: _hienThiMenuTuyChon,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _xayDungNutHanhDong({
+    required IconData icon,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isActive ? ChuDe.mauTinNhanGui : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
+          boxShadow: isActive ? ChuDe.shadowCard : null,
+        ),
+        child: Icon(
+          icon,
+          color: isActive ? Colors.white : ChuDe.mauChu,
+          size: 22,
+        ),
+      ),
+    );
+  }
+
+  Widget _xayDungTimKiem() {
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(0, -1),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _searchController,
+        curve: Curves.easeOutCubic,
+      )),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
+            boxShadow: ChuDe.shadowCard,
+          ),
+          child: TextField(
+            controller: _searchController2,
+            onChanged: _timKiem,
+            decoration: InputDecoration(
+              hintText: 'Tìm kiếm tin nhắn...',
+              prefixIcon:
+                  const Icon(Icons.search_rounded, color: ChuDe.mauChuPhu),
+              suffixIcon: _searchController2.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded),
+                      onPressed: () {
+                        _searchController2.clear();
+                        _timKiem('');
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            autofocus: true,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _xayDungTabTinNhan() {
+    if (_dangTai) {
+      return SizedBox(
+        height: MediaQuery.of(context).size.height - 200,
+        child: const Center(
+          child: CircularProgressIndicator(color: ChuDe.mauTinNhanGui),
+        ),
+      );
+    }
+
+    final danhSachHienThi =
+        _hienThiTimKiem && _searchController2.text.isNotEmpty
+            ? _danhSachTimKiem
+            : _danhSachCuocTroChuyenTomTat;
+
+    if (_dangTimKiem) {
+      return SizedBox(
+        height: MediaQuery.of(context).size.height - 200,
+        child: const Center(
+          child: CircularProgressIndicator(color: ChuDe.mauTinNhanGui),
+        ),
+      );
+    }
+
+    if (danhSachHienThi.isEmpty) {
+      return SizedBox(
+        height: MediaQuery.of(context).size.height - 200,
+        child: _xayDungManHinhTrong(),
+      );
+    }
+
+    return SizedBox(
+      height: MediaQuery.of(context).size.height - 160,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: danhSachHienThi.length,
+        separatorBuilder: (context, index) => const Divider(
+          height: 1,
+          indent: 88,
+          endIndent: 20,
+        ),
+        itemBuilder: (context, index) {
+          final cuocTroChuyenTomTat = danhSachHienThi[index];
+          return _xayDungItemCuocTroChuyenTomTat(cuocTroChuyenTomTat, index);
+        },
+      ),
+    );
+  }
+
+  Widget _xayDungItemCuocTroChuyenTomTat(
+      CuocTroChuyenTomTat cuocTroChuyenTomTat, int index) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        leading: _xayDungAvatar(cuocTroChuyenTomTat),
+        title: Row(
+          children: [
+            Expanded(
               child: Text(
-                story.tenNguoiDung,
-                style: const TextStyle(
-                  fontSize: 12,
+                cuocTroChuyenTomTat.tenNguoiKhac,
+                style: TextStyle(
+                  fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                      ? FontWeight.bold
+                      : FontWeight.w600,
+                  fontSize: 16,
                   color: ChuDe.mauChu,
                 ),
-                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(
+              cuocTroChuyenTomTat.thoiGianHienThi,
+              style: TextStyle(
+                fontSize: 12,
+                color: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                    ? ChuDe.mauTinNhanGui
+                    : ChuDe.mauChuPhu,
+                fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                    ? FontWeight.w600
+                    : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        subtitle: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _layNoiDungTinNhanHienThi(cuocTroChuyenTomTat),
+                style: TextStyle(
+                  color: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                      ? ChuDe.mauChu
+                      : ChuDe.mauChuPhu,
+                  fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                      ? FontWeight.w500
+                      : FontWeight.normal,
+                  fontSize: 14,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (cuocTroChuyenTomTat.soTinNhanChuaDoc > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: ChuDe.gradientTinNhan,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  cuocTroChuyenTomTat.soTinNhanChuaDoc > 99
+                      ? '99+'
+                      : cuocTroChuyenTomTat.soTinNhanChuaDoc.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
+        onTap: () => _moChiTietTinNhan(cuocTroChuyenTomTat),
       ),
-    ).animate().fadeIn(duration: 500.ms, delay: (100 * _danhSachStories.indexOf(story)).ms);
+    )
+        .animate(delay: Duration(milliseconds: index * 50))
+        .fadeIn(duration: 600.ms)
+        .slideX(begin: 0.2, end: 0);
   }
 
-  Widget _xayDungItemHeThong() {
-    return Column(
+  Widget _xayDungAvatar(CuocTroChuyenTomTat cuocTroChuyenTomTat) {
+    return Stack(
       children: [
-        _xayDungItemChat(
-          icon: Icons.people,
-          iconColor: Colors.blue,
-          title: 'Những Follower mới',
-          subtitle: 'Ngọc Sang đã bắt đầu follow b...',
-          time: '',
-          hasUnread: false,
-          onTap: () {},
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                  ? ChuDe.mauTinNhanGui
+                  : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: CircleAvatar(
+            radius: 26,
+            backgroundImage: NetworkImage(cuocTroChuyenTomTat.anhNguoiKhac),
+          ),
         ),
-        _xayDungItemChat(
-          icon: Icons.notifications,
-          iconColor: Colors.pink,
-          title: 'Hoạt động',
-          subtitle: 'thyynhi2004 đã xem hồ sơ của...',
-          time: '',
-          hasUnread: false,
-          onTap: () {},
-        ),
+        if (cuocTroChuyenTomTat.dangOnline)
+          Positioned(
+            bottom: 2,
+            right: 2,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: ChuDe.mauOnline,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  Widget _xayDungItemChat({
-    IconData? icon,
-    Color? iconColor,
-    String? avatarUrl,
-    required String title,
-    required String subtitle,
-    required String time,
-    required bool hasUnread,
-    int unreadCount = 0,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: icon != null
-          ? CircleAvatar(
-              backgroundColor: iconColor?.withOpacity(0.1),
-              child: Icon(icon, color: iconColor, size: 24),
-            )
-          : CircleAvatar(
-              backgroundImage: avatarUrl != null
-                  ? (avatarUrl.startsWith('http')
-                      ? NetworkImage(avatarUrl)
-                      : AssetImage(avatarUrl) as ImageProvider)
-                  : const AssetImage('assets/images/avatar_default.jpg'),
-            ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
-          fontSize: 16,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          color: hasUnread ? ChuDe.mauChu : Colors.grey.shade600,
-          fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Column(
+  Widget _xayDungManHinhTrong() {
+    return Center(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (time.isNotEmpty)
-            Text(
-              time,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: ChuDe.gradientTinNhan,
+              shape: BoxShape.circle,
             ),
-          if (hasUnread && unreadCount > 0) ...[
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: const BoxDecoration(
-                color: ChuDe.mauChinh,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                unreadCount > 99 ? '99+' : unreadCount.toString(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ] else if (hasUnread)
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: ChuDe.mauChinh,
-                shape: BoxShape.circle,
-              ),
-            ),
-        ],
-      ),
-      onTap: onTap,
-    );
-  }
-
-  Widget _xayDungItemCuocTroChuyenTomTat(CuocTroChuyenTomTat cuocTroChuyenTomTat) {
-    return _xayDungItemChat(
-      avatarUrl: cuocTroChuyenTomTat.anhNguoiKhac,
-      title: cuocTroChuyenTomTat.tenNguoiKhac,
-      subtitle: _layNoiDungTinNhanHienThi(cuocTroChuyenTomTat),
-      time: cuocTroChuyenTomTat.thoiGianHienThi,
-      hasUnread: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0,
-      unreadCount: cuocTroChuyenTomTat.soTinNhanChuaDoc,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ManHinhChiTietTinNhan(
-              maNguoiKhac: cuocTroChuyenTomTat.maNguoiKhac,
-              tenNguoiKhac: cuocTroChuyenTomTat.tenNguoiKhac,
-              anhNguoiKhac: cuocTroChuyenTomTat.anhNguoiKhac,
+            child: const Icon(
+              Icons.message_rounded,
+              size: 60,
+              color: Colors.white,
             ),
           ),
-        );
-      },
-    ).animate().fadeIn(duration: 500.ms, delay: 100.ms);
+          const SizedBox(height: 24),
+          const Text(
+            'Chưa có tin nhắn nào',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: ChuDe.mauChu,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Bắt đầu trò chuyện với những người\nyêu ẩm thực khác',
+            style: TextStyle(
+              fontSize: 16,
+              color: ChuDe.mauChuPhu,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: _hienThiDialogTaoTinNhanMoi,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChuDe.mauTinNhanGui,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
+              ),
+              elevation: 8,
+            ),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text(
+              'Tạo Tin Nhắn Mới',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 800.ms).scale(begin: const Offset(0.8, 0.8));
   }
 
   String _layNoiDungTinNhanHienThi(CuocTroChuyenTomTat cuocTroChuyenTomTat) {
@@ -383,42 +538,175 @@ class _ManHinhHopThuState extends State<ManHinhHopThu> {
         return '🍳 Chia sẻ công thức';
       case 'sticker':
         return '😊 Nhãn dán';
+      case 'voice':
+        return '🎤 Tin nhắn thoại';
+      case 'location':
+        return '📍 Vị trí';
+      case 'file':
+        return '📎 Tệp đính kèm';
       default:
         return cuocTroChuyenTomTat.tinNhanCuoi;
     }
   }
 
-  Widget _xayDungManHinhTrong() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.message_outlined,
-            size: 80,
-            color: Colors.grey.shade300,
+  void _moChiTietTinNhan(CuocTroChuyenTomTat cuocTroChuyenTomTat) {
+    HapticFeedback.lightImpact();
+
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            ManHinhChiTietTinNhan(
+          maNguoiKhac: cuocTroChuyenTomTat.maNguoiKhac,
+          tenNguoiKhac: cuocTroChuyenTomTat.tenNguoiKhac,
+          anhNguoiKhac: cuocTroChuyenTomTat.anhNguoiKhac,
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1.0, 0.0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+  }
+
+  void _hienThiMenuTuyChon() {
+    HapticFeedback.mediumImpact();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(ChuDe.borderRadiusXLarge),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Chưa có tin nhắn nào',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: ChuDe.mauChuPhu,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Bắt đầu trò chuyện với những người yêu ẩm thực khác',
-            style: TextStyle(
-              fontSize: 14,
-              color: ChuDe.mauChuPhu,
+            _xayDungTuyChonMenu(
+              icon: Icons.mark_email_read_rounded,
+              title: 'Đánh dấu tất cả đã đọc',
+              onTap: () {
+                Navigator.pop(context);
+                _danhDauTatCaDaDoc();
+              },
             ),
-            textAlign: TextAlign.center,
+            _xayDungTuyChonMenu(
+              icon: Icons.archive_rounded,
+              title: 'Tin nhắn đã lưu trữ',
+              onTap: () {
+                Navigator.pop(context);
+                _hienThiTinNhanDaLuuTru();
+              },
+            ),
+            _xayDungTuyChonMenu(
+              icon: Icons.settings_rounded,
+              title: 'Cài đặt tin nhắn',
+              onTap: () {
+                Navigator.pop(context);
+                _hienThiCaiDatTinNhan();
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _xayDungTuyChonMenu({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
+        ),
+        child: Icon(icon, color: ChuDe.mauChu),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w500),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  void _danhDauTatCaDaDoc() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã đánh dấu tất cả tin nhắn là đã đọc'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _hienThiTinNhanDaLuuTru() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Tính năng đang phát triển: Tin nhắn đã lưu trữ'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _hienThiCaiDatTinNhan() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Tính năng đang phát triển: Cài đặt tin nhắn'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _hienThiDialogTaoTinNhanMoi() {
+    HapticFeedback.mediumImpact();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
+        ),
+        title: const Text(
+          'Tạo Tin Nhắn Mới',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Tính năng này đang được phát triển. Bạn có thể nhắn tin với người dùng khác từ trang hồ sơ của họ.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 500.ms);
+    );
   }
 }

@@ -63,8 +63,6 @@ class DangKiDangNhapEmail with ChangeNotifier {
         await layNguoiDungHienTai();
         notifyListeners();
 
-        print(
-            'Người dùng hiện tại sau khi đăng nhập: ${nguoiDungHienTai?.hoTen}, ${nguoiDungHienTai?.soLuongCongThuc}');
         return user;
       }
 
@@ -209,9 +207,9 @@ class DangKiDangNhapEmail with ChangeNotifier {
             email: data['email'] ?? '',
             anhDaiDien: data['anhDaiDien'] ?? '',
             moTa: data['moTa'] ?? '',
-            soLuongCongThuc: data['soLuongCongThuc'] ?? 0,
-            soLuongNguoiTheoDoi: data['soLuongNguoiTheoDoi'] ?? 0,
-            soLuongDangTheoDoi: data['soLuongDangTheoDoi'] ?? 0,
+            congThucIds: List<String>.from(data['congThucIds'] ?? []),
+            nguoiTheoDoiIds: List<String>.from(data['nguoiTheoDoiIds'] ?? []),
+            dangTheoDoiIds: List<String>.from(data['dangTheoDoiIds'] ?? []),
           );
         }
       } catch (e) {

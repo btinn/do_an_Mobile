@@ -19,6 +19,44 @@ class ChuDe {
   static const Color mauXanhLaToi = Color(0xFF66BB6A);
   static const Color mauVangToi = Color(0xFFFFD740);
 
+  // Màu sắc cho tin nhắn - Chế độ sáng
+  static const Color mauTinNhanGui = Color(0xFF007AFF);
+  static const Color mauTinNhanNhan = Color(0xFFF2F2F7);
+  static const Color mauNenTinNhan = Color(0xFFFBFBFD);
+  static const Color mauViTri = Color(0xFF34C759);
+  static const Color mauOnline = Color(0xFF30D158);
+  static const Color mauOffline = Color(0xFF8E8E93);
+
+  // Màu sắc cho tin nhắn - Chế độ tối
+  static const Color mauTinNhanGuiToi = Color(0xFF0A84FF);
+  static const Color mauTinNhanNhanToi = Color(0xFF2C2C2E);
+  static const Color mauNenTinNhanToi = Color(0xFF000000);
+  static const Color mauViTriToi = Color(0xFF32D74B);
+  static const Color mauOnlineToi = Color(0xFF30D158);
+  static const Color mauOfflineToi = Color(0xFF636366);
+
+  // Gradient cho tin nhắn
+  static const LinearGradient gradientTinNhan = LinearGradient(
+    colors: [Color(0xFF007AFF), Color(0xFF5856D6)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // Shadow cho card
+  static const List<BoxShadow> shadowCard = [
+    BoxShadow(
+      color: Color(0x0A000000),
+      blurRadius: 10,
+      offset: Offset(0, 2),
+    ),
+  ];
+
+  // Border radius
+  static const double borderRadiusSmall = 8.0;
+  static const double borderRadiusMedium = 12.0;
+  static const double borderRadiusLarge = 16.0;
+  static const double borderRadiusXLarge = 20.0;
+
   // Kiểu chữ
   static const TextStyle kieuChuTieuDe = TextStyle(
     fontSize: 24,
