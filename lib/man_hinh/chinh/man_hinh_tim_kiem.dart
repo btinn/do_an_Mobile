@@ -100,6 +100,7 @@ class _ManHinhTimKiemState extends State<ManHinhTimKiem>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false, // Tắt nút back
         title: TextField(
           controller: _timKiemController,
           decoration: InputDecoration(
@@ -126,6 +127,15 @@ class _ManHinhTimKiemState extends State<ManHinhTimKiem>
           textInputAction: TextInputAction.search,
           style: const TextStyle(fontSize: 16),
         ),
+        actions: [
+          TextButton(
+            onPressed: _xoaTatCaLichSuTimKiem,
+            child: const Text(
+              'Xóa Tất Cả',
+              style: TextStyle(color: ChuDe.mauChinh),
+            ),
+          ),
+        ],
         bottom: _daTimKiem
             ? TabBar(
                 controller: _tabController,
@@ -160,21 +170,12 @@ class _ManHinhTimKiemState extends State<ManHinhTimKiem>
         children: [
           // Lịch sử tìm kiếm
           if (_lichSuTimKiem.isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Lịch Sử Tìm Kiếm',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                TextButton(
-                  onPressed: _xoaTatCaLichSuTimKiem,
-                  child: const Text('Xóa Tất Cả'),
-                ),
-              ],
+            const Text(
+              'Lịch Sử Tìm Kiếm',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ).animate().fadeIn(duration: 500.ms),
             const SizedBox(height: 8),
             Wrap(
@@ -263,7 +264,7 @@ class _ManHinhTimKiemState extends State<ManHinhTimKiem>
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           image: DecorationImage(
-            image: AssetImage(hinhAnh), // Thay NetworkImage bằng AssetImage
+            image: AssetImage(hinhAnh),
             fit: BoxFit.cover,
             colorFilter: ColorFilter.mode(
               Colors.black.withAlpha(100),
@@ -326,8 +327,7 @@ class _ManHinhTimKiemState extends State<ManHinhTimKiem>
             ),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.65,
+          Expanded(
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
