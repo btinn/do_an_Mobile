@@ -4,6 +4,8 @@ import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/nguoi_dung.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart'; // thêm import này nếu chưa có
 
 class ManHinhChinhSuaHoSo extends StatefulWidget {
   final NguoiDung nguoiDung;
@@ -58,7 +60,21 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
     }
   }
 
-  Future<void> _luuThongTin() async {
+  Future<String?> uploadAnhDaiDien(File file, String userId) async {
+    try {
+      final fileName = basename(file.path);
+      final ref =
+          FirebaseStorage.instance.ref().child('avatars/$userId/$fileName');
+
+      await ref.putFile(file);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      print('Lỗi upload ảnh đại diện: $e');
+      return null;
+    }
+  }
+
+  Future<void> _luuThongTin(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -66,6 +82,15 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
     });
 
     try {
+      String anhDaiDienUrl = widget.nguoiDung.anhDaiDien;
+
+      if (_anhDaiDien != null) {
+        final url = await uploadAnhDaiDien(_anhDaiDien!, widget.nguoiDung.ma);
+        if (url != null) {
+          anhDaiDienUrl = url;
+        }
+      }
+
       final docRef = FirebaseFirestore.instance
           .collection('user')
           .doc(widget.nguoiDung.ma);
@@ -77,11 +102,10 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
         'diaChi': _diaChiController.text,
         'ngaySinh': _ngaySinhController.text,
         'gioiTinh': _gioiTinh,
-        'anhDaiDien': _anhDaiDien != null
-            ? 'assets/images/avatar_updated.jpg' // bạn nên upload lên Firebase Storage
-            : widget.nguoiDung.anhDaiDien,
+        'anhDaiDien': anhDaiDienUrl,
       });
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Thông tin hồ sơ đã được cập nhật'),
@@ -112,7 +136,7 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
         title: const Text('Chỉnh Sửa Hồ Sơ'),
         actions: [
           TextButton.icon(
-            onPressed: _dangLuu ? null : _luuThongTin,
+            onPressed: _dangLuu ? null : () => _luuThongTin(context),
             icon: _dangLuu
                 ? const SizedBox(
                     width: 16,
@@ -205,7 +229,7 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _dangLuu ? null : _luuThongTin,
+                  onPressed: _dangLuu ? null : () => _luuThongTin(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ChuDe.mauChinh,
                     foregroundColor: Colors.white,

@@ -15,7 +15,7 @@ class ManHinhChinh extends StatefulWidget {
 
 class _ManHinhChinhState extends State<ManHinhChinh> {
   int _chiSoHienTai = 0;
-  
+
   late List<Widget> _manHinh;
 
   @override
