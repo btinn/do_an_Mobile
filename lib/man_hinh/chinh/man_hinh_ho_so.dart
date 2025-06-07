@@ -207,7 +207,7 @@ class _ManHinhHoSoState extends State<ManHinhHoSo>
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _xayDungThongKe(
-                      nguoiDung.soLuongCongThuc.toString(),
+                      nguoiDung.congThucIds.length.toString(),
                       'Công Thức',
                     ),
                     Container(
@@ -216,7 +216,7 @@ class _ManHinhHoSoState extends State<ManHinhHoSo>
                       color: Colors.grey.shade300,
                     ),
                     _xayDungThongKe(
-                      nguoiDung.soLuongNguoiTheoDoi.toString(),
+                      nguoiDung.nguoiTheoDoiIds.length.toString(),
                       'Người Theo Dõi',
                     ),
                     Container(
@@ -225,7 +225,7 @@ class _ManHinhHoSoState extends State<ManHinhHoSo>
                       color: Colors.grey.shade300,
                     ),
                     _xayDungThongKe(
-                      nguoiDung.soLuongDangTheoDoi.toString(),
+                      nguoiDung.dangTheoDoiIds.length.toString(),
                       'Đang Theo Dõi',
                     ),
                   ],

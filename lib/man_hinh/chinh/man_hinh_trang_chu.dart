@@ -479,7 +479,6 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
           ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
 
           const SizedBox(height: 16),
-          //sadsadsasadsdsasadasdsadsadasdsa
           // Danh sách công thức sau khi lọc
           GridView.builder(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
