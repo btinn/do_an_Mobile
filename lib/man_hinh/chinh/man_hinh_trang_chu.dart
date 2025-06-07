@@ -1,6 +1,7 @@
 import 'package:do_an/dich_vu/dich_vu_cong_thuc.dart';
 import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:do_an/dich_vu/dich_vu_thong_bao.dart';
+import 'package:do_an/man_hinh/chinh/man_hinh_tim_kiem.dart';
 import 'package:flutter/material.dart';
 import 'package:do_an/mo_hinh/cong_thuc.dart';
 import 'package:do_an/mo_hinh/thong_bao.dart';
@@ -13,16 +14,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_carousel_widget/flutter_carousel_widget.dart';
 
 class ManHinhTrangChu extends StatefulWidget {
-  final VoidCallback? onChuyenSangTimKiem;
-<<<<<<< HEAD
-
-=======
-  
->>>>>>> huy
-  const ManHinhTrangChu({
-    super.key,
-    this.onChuyenSangTimKiem,
-  });
+  const ManHinhTrangChu({super.key});
 
   @override
   State<ManHinhTrangChu> createState() => _ManHinhTrangChuState();
@@ -174,7 +166,6 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
               snap: false,
               backgroundColor: Colors.white,
               elevation: 0,
-              automaticallyImplyLeading: false, // Tắt nút back mặc định
               title: Row(
                 children: [
                   CircleAvatar(
@@ -252,10 +243,12 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                             horizontal: 16, vertical: 8),
                         child: GestureDetector(
                           onTap: () {
-                            // Chuyển sang tab tìm kiếm thay vì navigate
-                            if (widget.onChuyenSangTimKiem != null) {
-                              widget.onChuyenSangTimKiem!();
-                            }
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ManHinhTimKiem(),
+                              ),
+                            );
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -691,10 +684,9 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
 
           const SizedBox(height: 16),
 <<<<<<< HEAD
-
 =======
           
->>>>>>> huy
+>>>>>>> hzuy
           // Danh sách công thức sau khi lọc
           GridView.builder(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
