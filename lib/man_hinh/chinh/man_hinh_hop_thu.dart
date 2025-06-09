@@ -5,6 +5,7 @@ import 'package:do_an/dich_vu/dich_vu_tin_nhan.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_tin_nhan.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:do_an/mo_hinh/cuoc_tro_chuyen_tom_tat.dart';
+import 'package:do_an/mo_hinh/tin_nhan.dart';
 
 class ManHinhHopThu extends StatefulWidget {
   const ManHinhHopThu({super.key});
@@ -24,10 +25,16 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
 
   List<CuocTroChuyenTomTat> _danhSachCuocTroChuyenTomTat = [];
   List<CuocTroChuyenTomTat> _danhSachTimKiem = [];
+  
+  // Map để lưu trữ tin nhắn theo người dùng
+  final Map<String, List<TinNhan>> _danhSachTinNhanTheoNguoiDung = {};
 
   bool _dangTai = false;
   bool _dangTimKiem = false;
   bool _hienThiTimKiem = false;
+  
+  // ID người dùng hiện tại (giả lập)
+  final String _maNguoiDungHienTai = 'current_user';
 
   @override
   void initState() {
@@ -42,7 +49,7 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
     );
 
     setState(() => _dangTai = true);
-    _taiDuLieuRealTime(); // Thay vì _taiDuLieu()
+    _taiDuLieuRealTime();
     _scrollController.addListener(_onScroll);
   }
 
@@ -64,11 +71,28 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
   }
 
   void _taiDuLieuRealTime() {
-    _dichVuTinNhan.langNgheCuocTroChuyenTomTat('current_user').listen((danhSach) {
+    _dichVuTinNhan.langNgheCuocTroChuyenTomTat(_maNguoiDungHienTai).listen((danhSach) {
       if (mounted) {
         setState(() {
           _danhSachCuocTroChuyenTomTat = danhSach;
           _dangTai = false;
+        });
+        
+        // Tải tin nhắn cho mỗi cuộc trò chuyện
+        for (var cuocTroChuyenTomTat in danhSach) {
+          _taiTinNhanTheoNguoiDung(cuocTroChuyenTomTat.maNguoiKhac);
+        }
+      }
+    });
+  }
+  
+  void _taiTinNhanTheoNguoiDung(String maNguoiKhac) {
+    final cuocTroChuyenId = _dichVuTinNhan.taoMaCuocTroChuyenId(_maNguoiDungHienTai, maNguoiKhac);
+    
+    _dichVuTinNhan.langNgheTinNhan(cuocTroChuyenId).listen((danhSachTinNhan) {
+      if (mounted) {
+        setState(() {
+          _danhSachTinNhanTheoNguoiDung[maNguoiKhac] = danhSachTinNhan;
         });
       }
     });
@@ -333,6 +357,17 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
 
   Widget _xayDungItemCuocTroChuyenTomTat(
       CuocTroChuyenTomTat cuocTroChuyenTomTat, int index) {
+    // Lấy danh sách tin nhắn của cuộc trò chuyện này
+    final danhSachTinNhan = _danhSachTinNhanTheoNguoiDung[cuocTroChuyenTomTat.maNguoiKhac] ?? [];
+    
+    // Lấy 3 tin nhắn gần nhất để hiển thị bong bóng chat
+    final tinNhanGanNhat = danhSachTinNhan.isNotEmpty 
+        ? danhSachTinNhan.sublist(
+            danhSachTinNhan.length > 3 ? danhSachTinNhan.length - 3 : 0, 
+            danhSachTinNhan.length
+          )
+        : <TinNhan>[];
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -346,85 +381,152 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: _xayDungAvatar(cuocTroChuyenTomTat),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                cuocTroChuyenTomTat?.tenNguoiKhac ?? '',
-                style: TextStyle(
-                  fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
-                      ? FontWeight.bold
-                      : FontWeight.w600,
-                  fontSize: 16,
-                  color: ChuDe.mauChu,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Text(
-              cuocTroChuyenTomTat.thoiGianHienThi,
-              style: TextStyle(
-                fontSize: 12,
-                color: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
-                    ? ChuDe.mauTinNhanGui
-                    : ChuDe.mauChuPhu,
-                fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
-                    ? FontWeight.w600
-                    : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-        subtitle: Row(
-          children: [
-            Expanded(
-              child: Text(
-                _layNoiDungTinNhanHienThi(cuocTroChuyenTomTat),
-                style: TextStyle(
-                  color: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
-                      ? ChuDe.mauChu
-                      : ChuDe.mauChuPhu,
-                  fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
-                      ? FontWeight.w500
-                      : FontWeight.normal,
-                  fontSize: 14,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (cuocTroChuyenTomTat.soTinNhanChuaDoc > 0) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  gradient: ChuDe.gradientTinNhan,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  cuocTroChuyenTomTat.soTinNhanChuaDoc > 99
-                      ? '99+'
-                      : cuocTroChuyenTomTat.soTinNhanChuaDoc.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            leading: _xayDungAvatar(cuocTroChuyenTomTat),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    cuocTroChuyenTomTat.tenNguoiKhac,
+                    style: TextStyle(
+                      fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                          ? FontWeight.bold
+                          : FontWeight.w600,
+                      fontSize: 16,
+                      color: ChuDe.mauChu,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-            ],
-          ],
-        ),
-        onTap: () => _moChiTietTinNhan(cuocTroChuyenTomTat),
+                Text(
+                  cuocTroChuyenTomTat.thoiGianHienThi,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                        ? ChuDe.mauTinNhanGui
+                        : ChuDe.mauChuPhu,
+                    fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+            subtitle: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _layNoiDungTinNhanHienThi(cuocTroChuyenTomTat),
+                    style: TextStyle(
+                      color: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                          ? ChuDe.mauChu
+                          : ChuDe.mauChuPhu,
+                      fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
+                          ? FontWeight.w500
+                          : FontWeight.normal,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (cuocTroChuyenTomTat.soTinNhanChuaDoc > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: ChuDe.gradientTinNhan,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      cuocTroChuyenTomTat.soTinNhanChuaDoc > 99
+                          ? '99+'
+                          : cuocTroChuyenTomTat.soTinNhanChuaDoc.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            onTap: () => _moChiTietTinNhan(cuocTroChuyenTomTat),
+          ),
+          
+          // Hiển thị bong bóng chat
+          if (tinNhanGanNhat.isNotEmpty)
+            _xayDungBongBongChat(tinNhanGanNhat, cuocTroChuyenTomTat),
+        ],
       ),
     )
         .animate(delay: Duration(milliseconds: index * 50))
         .fadeIn(duration: 600.ms)
         .slideX(begin: 0.2, end: 0);
+  }
+  
+  Widget _xayDungBongBongChat(List<TinNhan> tinNhanGanNhat, CuocTroChuyenTomTat cuocTroChuyenTomTat) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Column(
+        children: tinNhanGanNhat.map((tinNhan) {
+          final laTinNhanCuaToi = tinNhan.maNguoiGui == _maNguoiDungHienTai;
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: laTinNhanCuaToi 
+                  ? MainAxisAlignment.end 
+                  : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (!laTinNhanCuaToi) ...[
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundImage: NetworkImage(cuocTroChuyenTomTat.anhNguoiKhac),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: laTinNhanCuaToi 
+                          ? ChuDe.mauTinNhanGui 
+                          : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      tinNhan.noiDung,
+                      style: TextStyle(
+                        color: laTinNhanCuaToi ? Colors.white : Colors.black87,
+                        fontSize: 13,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                
+                if (laTinNhanCuaToi) ...[
+                  const SizedBox(width: 8),
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundImage: const NetworkImage('https://ui-avatars.com/api/?name=Me&background=0D8ABC&color=fff'),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   Widget _xayDungTrangThaiOnline(String maNguoiKhac) {
@@ -549,7 +651,7 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
       case 'file':
         return '📎 Tệp đính kèm';
       default:
-        return cuocTroChuyenTomTat?.tinNhanCuoi ?? '';
+        return cuocTroChuyenTomTat.tinNhanCuoi;
     }
   }
 

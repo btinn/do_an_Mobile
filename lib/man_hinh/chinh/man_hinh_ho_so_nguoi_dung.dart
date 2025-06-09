@@ -1,14 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:do_an/giao_dien/chu_de.dart';
-import 'package:do_an/dich_vu/dich_vu_nguoi_dung.dart';
-import 'package:do_an/dich_vu/dich_vu_tin_nhan.dart';
-import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_tin_nhan.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:do_an/dich_vu/dich_vu_cong_thuc.dart';
-import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_cong_thuc.dart';
-import 'package:do_an/mo_hinh/cong_thuc.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
+import 'package:flutter/material.dart';
+import 'package:do_an/giao_dien/chu_de.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_tin_nhan.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:do_an/mo_hinh/cong_thuc.dart';
+import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_cong_thuc.dart';
+import 'package:do_an/dich_vu/dich_vu_cong_thuc.dart';
+import 'package:do_an/dich_vu/dich_vu_nguoi_dung.dart';
+import 'dart:io';
+
 import 'package:provider/provider.dart';
 
 class ManHinhHoSoNguoiDung extends StatefulWidget {
@@ -28,759 +30,818 @@ class ManHinhHoSoNguoiDung extends StatefulWidget {
 }
 
 class _ManHinhHoSoNguoiDungState extends State<ManHinhHoSoNguoiDung>
-    with TickerProviderStateMixin {
-  final DichVuNguoiDung _dichVuNguoiDung = DichVuNguoiDung();
-  final DichVuTinNhan _dichVuTinNhan = DichVuTinNhan();
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final DichVuCongThuc _dichVuCongThuc = DichVuCongThuc();
+  final DichVuNguoiDung _dichVuNguoiDung = DichVuNguoiDung();
 
-  late AnimationController _animationController;
-  late AnimationController _buttonController;
-
-  Map<String, dynamic> _thongTinNguoiDung = {};
   bool _dangTheoDoi = false;
+  Map<String, dynamic> _thongTinNguoiDung = {};
+  List<CongThuc> _danhSachCongThucCuaTacGia = [];
   bool _dangTai = true;
-  bool _dangXuLy = false;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _buttonController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-
+    _tabController = TabController(length: 2, vsync: this);
     _taiThongTinNguoiDung();
-    _animationController.forward();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _buttonController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
   Future<void> _taiThongTinNguoiDung() async {
+    setState(() => _dangTai = true);
+
     try {
-      // Lấy người dùng hiện tại
+      // Sử dụng dịch vụ người dùng để lấy thông tin
+      final thongTinNguoiDung = await _dichVuNguoiDung.layThongTinNguoiDung(widget.maNguoiDung);
+      
+      // Kiểm tra trạng thái theo dõi
       final nguoiDungHienTai = context.read<DangKiDangNhapEmail>().nguoiDungHienTai;
-      final uidNguoiHienTai = nguoiDungHienTai?.ma ?? '';
-      
-      final thongTin = await _dichVuNguoiDung.layThongTinNguoiDung(widget.maNguoiDung);
-      
-      // Chỉ kiểm tra theo dõi nếu không phải chính mình
-      bool dangTheoDoi = false;
-      if (uidNguoiHienTai.isNotEmpty && uidNguoiHienTai != widget.maNguoiDung) {
-        dangTheoDoi = await _dichVuNguoiDung.kiemTraDangTheoDoi(
-          widget.maNguoiDung,
-          uidNguoiHienTai,
+      if (nguoiDungHienTai != null) {
+        final dangTheoDoi = await _dichVuNguoiDung.kiemTraDangTheoDoi(
+          widget.maNguoiDung, 
+          nguoiDungHienTai.ma
         );
+        
+        setState(() {
+          _dangTheoDoi = dangTheoDoi;
+        });
       }
 
       setState(() {
-        _thongTinNguoiDung = thongTin;
-        _dangTheoDoi = dangTheoDoi;
-        _dangTai = false;
+        _thongTinNguoiDung = thongTinNguoiDung;
       });
+
+      // Lấy danh sách công thức
+      await _taiDanhSachCongThucCuaTacGia();
     } catch (e) {
       debugPrint('Lỗi tải thông tin người dùng: $e');
-      setState(() => _dangTai = false);
+    }
+
+    setState(() => _dangTai = false);
+  }
+
+  Future<void> _taiDanhSachCongThucCuaTacGia() async {
+    try {
+      final nguoiDungHienTai = context.read<DangKiDangNhapEmail>().nguoiDungHienTai;
+      final uidNguoiXem = nguoiDungHienTai?.ma ?? '';
+      
+      // Sử dụng service để lấy danh sách công thức
+      _danhSachCongThucCuaTacGia = await _dichVuCongThuc.layDanhSachCongThucCuaTacGia(
+        widget.maNguoiDung,
+        uidNguoiXem
+      );
+
+      setState(() {});
+    } catch (e) {
+      debugPrint('Lỗi tải danh sách công thức: $e');
     }
   }
 
-  Future<void> _xuLyTheoDoi() async {
-    if (_dangXuLy) return;
-
-    // Lấy người dùng hiện tại
+  void _toggleTheoDoi() async {
     final nguoiDungHienTai = context.read<DangKiDangNhapEmail>().nguoiDungHienTai;
+    final uidNguoiDangXem = widget.maNguoiDung;
     final uidNguoiHienTai = nguoiDungHienTai?.ma;
 
-    if (uidNguoiHienTai == null || uidNguoiHienTai.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập để theo dõi')),
-      );
-      return;
-    }
-
-    if (uidNguoiHienTai == widget.maNguoiDung) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể theo dõi chính mình')),
-      );
-      return;
-    }
-
-    setState(() => _dangXuLy = true);
-    _buttonController.forward();
-    HapticFeedback.lightImpact();
+    if (uidNguoiHienTai == null || uidNguoiDangXem == uidNguoiHienTai) return;
 
     try {
       bool thanhCong;
+      
       if (_dangTheoDoi) {
-        thanhCong = await _dichVuNguoiDung.huyTheoDoi(
-          widget.maNguoiDung,
-          uidNguoiHienTai,
-        );
+        // Hủy theo dõi
+        thanhCong = await _dichVuNguoiDung.huyTheoDoi(uidNguoiDangXem, uidNguoiHienTai);
+        
+        if (thanhCong) {
+          setState(() {
+            _dangTheoDoi = false;
+            _thongTinNguoiDung['followers'] = (_thongTinNguoiDung['followers'] ?? 1) - 1;
+          });
+        }
       } else {
-        thanhCong = await _dichVuNguoiDung.theoDoi(
-          widget.maNguoiDung,
-          uidNguoiHienTai,
-        );
+        // Bắt đầu theo dõi
+        thanhCong = await _dichVuNguoiDung.theoDoi(uidNguoiDangXem, uidNguoiHienTai);
+        
+        if (thanhCong) {
+          setState(() {
+            _dangTheoDoi = true;
+            _thongTinNguoiDung['followers'] = (_thongTinNguoiDung['followers'] ?? 0) + 1;
+          });
+        }
       }
 
       if (thanhCong) {
-        setState(() {
-          _dangTheoDoi = !_dangTheoDoi;
-          if (_dangTheoDoi) {
-            _thongTinNguoiDung['followers'] = (_thongTinNguoiDung['followers'] ?? 0) + 1;
-          } else {
-            _thongTinNguoiDung['followers'] = (_thongTinNguoiDung['followers'] ?? 1) - 1;
-          }
-        });
-
-        HapticFeedback.mediumImpact();
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_dangTheoDoi 
-              ? 'Đã theo dõi ${widget.tenNguoiDung}' 
-              : 'Đã hủy theo dõi ${widget.tenNguoiDung}'),
+            content: Text(_dangTheoDoi
+                ? 'Đã theo dõi ${widget.tenNguoiDung}'
+                : 'Đã hủy theo dõi ${widget.tenNguoiDung}'),
             behavior: SnackBarBehavior.floating,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Có lỗi xảy ra, vui lòng thử lại')),
+          const SnackBar(content: Text('Có lỗi xảy ra, vui lòng thử lại sau')),
         );
       }
     } catch (e) {
-      debugPrint('Lỗi xử lý theo dõi: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi ${_dangTheoDoi ? 'hủy theo dõi' : 'theo dõi'}. Vui lòng thử lại.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      setState(() => _dangXuLy = false);
-      _buttonController.reverse();
+      debugPrint('Lỗi khi cập nhật theo dõi: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Có lỗi xảy ra, vui lòng thử lại sau')),
+      );
     }
   }
 
-  Future<void> _moTinNhan() async {
-    HapticFeedback.lightImpact();
-
-    // Lấy người dùng hiện tại
-    final nguoiDungHienTai = context.read<DangKiDangNhapEmail>().nguoiDungHienTai;
-    final uidNguoiHienTai = nguoiDungHienTai?.ma;
-
-    if (uidNguoiHienTai == null || uidNguoiHienTai.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập để nhắn tin')),
-      );
-      return;
-    }
-
-    // Cập nhật trạng thái online cho người dùng hiện tại
-    await _dichVuTinNhan.capNhatTrangThaiOnline(uidNguoiHienTai, true);
-
-    if (mounted) {
-      Navigator.push(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              ManHinhChiTietTinNhan(
-            maNguoiKhac: widget.maNguoiDung,
-            tenNguoiKhac: widget.tenNguoiDung,
-            anhNguoiKhac: widget.anhDaiDien,
-          ),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-              )),
-              child: child,
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 300),
+  void _moManHinhNhanTin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManHinhChiTietTinNhan(
+          maNguoiKhac: widget.maNguoiDung,
+          tenNguoiKhac: widget.tenNguoiDung,
+          anhNguoiKhac: widget.anhDaiDien,
         ),
-      );
-    }
+      ),
+    );
+  }
+
+  Future<void> _refreshData() async {
+    await _taiThongTinNguoiDung();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh data khi quay lại từ màn hình khác
+    _refreshData();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_dangTai) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: ChuDe.mauNenTinNhan,
-      body: _dangTai ? _xayDungManHinhTai() : _xayDungNoiDung(),
-    );
-  }
-
-  Widget _xayDungManHinhTai() {
-    return const Center(
-      child: CircularProgressIndicator(color: ChuDe.mauChinh),
-    );
-  }
-
-  Widget _xayDungNoiDung() {
-    return CustomScrollView(
-      slivers: [
-        _xayDungSliverAppBar(),
-        SliverToBoxAdapter(
-          child: Column(
-            children: [
-              _xayDungThongTinCoBan(),
-              _xayDungCacNutHanhDong(),
-              _xayDungThongKe(),
-              _xayDungTrangThaiOnline(),
-              const SizedBox(height: 20),
-              _xayDungDanhSachCongThuc(),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _xayDungSliverAppBar() {
-    return SliverAppBar(
-      expandedHeight: 200,
-      floating: false,
-      pinned: true,
-      backgroundColor: Colors.white,
-      elevation: 0,
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
-      leading: IconButton(
-        icon: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: ChuDe.shadowCard,
-          ),
-          child: const Icon(Icons.arrow_back_ios_rounded, size: 18),
-        ),
-        onPressed: () => Navigator.pop(context),
-      ),
-      actions: [
-        IconButton(
-          icon: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: ChuDe.shadowCard,
-            ),
-            child: const Icon(Icons.more_vert_rounded, size: 18),
-          ),
-          onPressed: _hienThiMenuTuyChon,
-        ),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [ChuDe.mauChinh, Colors.white],
-            ),
-          ),
-          child: Center(
-            child: Hero(
-              tag: 'avatar_${widget.maNguoiDung}',
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              expandedHeight: 100,
+              pinned: true,
+              backgroundColor: ChuDe.mauChinh,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              flexibleSpace: FlexibleSpaceBar(
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            ChuDe.mauChinh,
+                            ChuDe.mauChinh.withAlpha(200),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 50,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(30),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: CircleAvatar(
-                  radius: 58,
-                  backgroundImage: NetworkImage(widget.anhDaiDien),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _xayDungThongTinNguoiDung(),
+            ),
+            SliverPersistentHeader(
+              delegate: _SliverAppBarDelegate(
+                TabBar(
+                  controller: _tabController,
+                  labelColor: ChuDe.mauChinh,
+                  unselectedLabelColor: ChuDe.mauChuPhu,
+                  indicatorColor: ChuDe.mauChinh,
+                  tabs: const [
+                    Tab(text: 'Công Thức'),
+                    Tab(text: 'Đã Lưu'),
+                  ],
                 ),
               ),
+              pinned: true,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _xayDungThongTinCoBan() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Text(
-            widget.tenNguoiDung,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: ChuDe.mauChu,
-            ),
-          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3),
-          const SizedBox(height: 8),
-          Text(
-            _thongTinNguoiDung['username'] ?? '@${widget.tenNguoiDung.toLowerCase()}',
-            style: const TextStyle(
-              fontSize: 16,
-              color: ChuDe.mauChuPhu,
-              fontWeight: FontWeight.w500,
-            ),
-          ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3),
-        ],
-      ),
-    );
-  }
-
-  Widget _xayDungCacNutHanhDong() {
-  // Lấy người dùng hiện tại
-  final nguoiDungHienTai = context.read<DangKiDangNhapEmail>().nguoiDungHienTai;
-  final uidNguoiHienTai = nguoiDungHienTai?.ma ?? '';
-  final laChinhMinh = uidNguoiHienTai == widget.maNguoiDung;
-
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Row(
-      children: [
-        if (!laChinhMinh) ...[
-          Expanded(
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 1.0, end: 0.95).animate(
-                CurvedAnimation(parent: _buttonController, curve: Curves.easeInOut),
-              ),
-              child: ElevatedButton.icon(
-                onPressed: _dangXuLy ? null : _xuLyTheoDoi,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _dangTheoDoi ? Colors.grey.shade200 : ChuDe.mauChinh,
-                  foregroundColor: _dangTheoDoi ? ChuDe.mauChu : Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
-                  ),
-                  elevation: _dangTheoDoi ? 0 : 4,
-                ),
-                icon: _dangXuLy
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: _dangTheoDoi ? ChuDe.mauChu : Colors.white,
-                        ),
-                      )
-                    : Icon(_dangTheoDoi ? Icons.check_rounded : Icons.add_rounded),
-                label: Text(
-                  _dangTheoDoi ? 'Đang Theo Dõi' : 'Theo Dõi',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-        ],
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: laChinhMinh ? null : _moTinNhan,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: laChinhMinh ? Colors.grey : ChuDe.mauChinh,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
-                side: BorderSide(color: laChinhMinh ? Colors.grey : ChuDe.mauChinh),
-              ),
-              elevation: 0,
-            ),
-            icon: const Icon(Icons.message_rounded),
-            label: Text(
-              laChinhMinh ? 'Hồ Sơ Của Bạn' : 'Nhắn Tin',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-      ],
-    ),
-  ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.3);
-}
-
-  Widget _xayDungThongKe() {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
-        boxShadow: ChuDe.shadowCard,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _xayDungItemThongKe(
-            'Công Thức',
-            (_thongTinNguoiDung['recipes'] ?? 0).toString(),
-            Icons.restaurant_menu_rounded,
-          ),
-          Container(width: 1, height: 40, color: Colors.grey.shade300),
-          _xayDungItemThongKe(
-            'Người Theo Dõi',
-            (_thongTinNguoiDung['followers'] ?? 0).toString(),
-            Icons.people_rounded,
-          ),
-          Container(width: 1, height: 40, color: Colors.grey.shade300),
-          _xayDungItemThongKe(
-            'Đang Theo Dõi',
-            (_thongTinNguoiDung['following'] ?? 0).toString(),
-            Icons.person_add_rounded,
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.3);
-  }
-
-  Widget _xayDungItemThongKe(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: ChuDe.mauChinh.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
-          ),
-          child: Icon(icon, color: ChuDe.mauChinh, size: 20),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: ChuDe.mauChu,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: ChuDe.mauChuPhu,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _xayDungTrangThaiOnline() {
-    return StreamBuilder<bool>(
-      stream: _dichVuTinNhan.langNgheTrangThaiOnline(widget.maNguoiDung),
-      builder: (context, snapshot) {
-        final isOnline = snapshot.data ?? false;
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: isOnline ? ChuDe.mauOnline.withValues(alpha: 0.1) : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isOnline ? ChuDe.mauOnline : Colors.grey,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isOnline ? 'Đang hoạt động' : 'Không hoạt động',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isOnline ? ChuDe.mauOnline : Colors.grey,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    ).animate().fadeIn(delay: 600.ms);
-  }
-
-  Widget _xayDungDanhSachCongThuc() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
-        boxShadow: ChuDe.shadowCard,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(20),
-            child: Text(
-              'Công Thức',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: ChuDe.mauChu,
-              ),
-            ),
-          ),
-          FutureBuilder<List<CongThuc>>(
-            future: _dichVuCongThuc.layDanhSachCongThucCuaTacGia(
-              widget.maNguoiDung,
-              context.read<DangKiDangNhapEmail>().nguoiDungHienTai?.ma ?? '',
-            ),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (snapshot.hasError) {
-                return const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(
-                    child: Text(
-                      'Lỗi khi tải công thức',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ),
-                );
-              }
-
-              final danhSachCongThuc = snapshot.data ?? [];
-
-              if (danhSachCongThuc.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(
-                    child: Text(
-                      'Chưa có công thức nào',
-                      style: TextStyle(
-                        color: ChuDe.mauChuPhu,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.8,
-                ),
-                itemCount: danhSachCongThuc.length,
-                itemBuilder: (context, index) {
-                  final congThuc = danhSachCongThuc[index];
-                  return _xayDungTheCongThuc(congThuc);
-                },
-              );
-            },
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.3);
-  }
-
-  Widget _xayDungTheCongThuc(CongThuc congThuc) {
-  return GestureDetector(
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ManHinhChiTietCongThuc(congThuc: congThuc),
-        ),
-      );
-    },
-    child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: Image.network(
-                congThuc.hinhAnh,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey.shade200,
-                    child: const Icon(Icons.restaurant, size: 40),
-                  );
-                },
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    congThuc.tenMon,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      const Icon(Icons.favorite, color: Colors.red, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${congThuc.luotThich}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const Spacer(),
-                      const Icon(Icons.star, color: Colors.amber, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        congThuc.diemDanhGia.toStringAsFixed(1),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-  void _hienThiMenuTuyChon() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(ChuDe.borderRadiusXLarge),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+          ];
+        },
+        body: TabBarView(
+          controller: _tabController,
           children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
+            // Tab Công Thức - hiển thị danh sách công thức thực tế
+            _xayDungTabCongThuc(),
+            _xayDungKhongCoDuLieu(
+              'Không thể xem công thức đã lưu',
+              'Chỉ chủ tài khoản mới có thể xem mục này',
+              Icons.bookmark_border,
+              'Quay Lại',
+              () => _tabController.animateTo(0),
             ),
-            _xayDungTuyChonMenu(
-              icon: Icons.share_rounded,
-              title: 'Chia sẻ hồ sơ',
-              onTap: () => Navigator.pop(context),
-            ),
-            _xayDungTuyChonMenu(
-              icon: Icons.copy_rounded,
-              title: 'Sao chép liên kết',
-              onTap: () => Navigator.pop(context),
-            ),
-            _xayDungTuyChonMenu(
-              icon: Icons.report_rounded,
-              title: 'Báo cáo',
-              onTap: () => Navigator.pop(context),
-              isDestructive: true,
-            ),
-            _xayDungTuyChonMenu(
-              icon: Icons.block_rounded,
-              title: 'Chặn người dùng',
-              onTap: () => Navigator.pop(context),
-              isDestructive: true,
-            ),
-            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _xayDungTuyChonMenu({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    bool isDestructive = false,
-  }) {
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: isDestructive ? Colors.red.shade50 : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
-        ),
-        child: Icon(
-          icon,
-          color: isDestructive ? Colors.red : ChuDe.mauChu,
-        ),
+  Widget _xayDungThongTinNguoiDung() {
+    final username = _thongTinNguoiDung['username'] ?? '@unknown';
+    final followers = _thongTinNguoiDung['followers'] ?? 0;
+    final following = _thongTinNguoiDung['following'] ?? 0;
+    final recipes = _thongTinNguoiDung['recipes'] ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          // Ảnh đại diện
+          Transform.translate(
+            offset: const Offset(0, -5),
+            child: CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.white,
+              child: CircleAvatar(
+                radius: 47,
+                backgroundImage: widget.anhDaiDien.startsWith('http')
+                    ? NetworkImage(widget.anhDaiDien)
+                    : AssetImage(widget.anhDaiDien) as ImageProvider,
+              ),
+            ),
+          ),
+
+          // Thông tin người dùng
+          Transform.translate(
+            offset: const Offset(0, -1),
+            child: Column(
+              children: [
+                Text(
+                  widget.tenNguoiDung,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  username,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: ChuDe.mauChuPhu,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+
+                // Số liệu thống kê
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _xayDungThongKe(
+                      recipes.toString(),
+                      'Công Thức',
+                    ),
+                    Container(
+                      height: 30,
+                      width: 1,
+                      color: Colors.grey.shade300,
+                    ),
+                    _xayDungThongKe(
+                      followers.toString(),
+                      'Người Theo Dõi',
+                    ),
+                    Container(
+                      height: 30,
+                      width: 1,
+                      color: Colors.grey.shade300,
+                    ),
+                    _xayDungThongKe(
+                      following.toString(),
+                      'Đang Theo Dõi',
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Nút theo dõi và nhắn tin
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _toggleTheoDoi,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            _dangTheoDoi ? Colors.white : ChuDe.mauChinh,
+                        foregroundColor:
+                            _dangTheoDoi ? ChuDe.mauChinh : Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: _dangTheoDoi
+                                ? ChuDe.mauChinh
+                                : Colors.transparent,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_dangTheoDoi ? Icons.check : Icons.add),
+                          const SizedBox(width: 4),
+                          Text(_dangTheoDoi ? 'Đang Theo Dõi' : 'Theo Dõi'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: _moManHinhNhanTin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: ChuDe.mauChinh,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: ChuDe.mauChinh),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.message_outlined),
+                          SizedBox(width: 4),
+                          Text('Nhắn Tin'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w500,
-          color: isDestructive ? Colors.red : ChuDe.mauChu,
+    ).animate().fadeIn(duration: 500.ms);
+  }
+
+  Widget _xayDungThongKe(String soLuong, String nhan) {
+    return Column(
+      children: [
+        Text(
+          soLuong,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-      onTap: onTap,
+        Text(
+          nhan,
+          style: const TextStyle(
+            fontSize: 12,
+            color: ChuDe.mauChuPhu,
+          ),
+        ),
+      ],
     );
+  }
+
+  Widget _xayDungKhongCoDuLieu(
+    String tieuDe,
+    String moTa,
+    IconData icon,
+    String nhanNut,
+    VoidCallback onPressed,
+  ) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 80,
+              color: Colors.grey.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              tieuDe,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: ChuDe.mauChuPhu,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              moTa,
+              style: const TextStyle(
+                fontSize: 14,
+                color: ChuDe.mauChuPhu,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ChuDe.mauChinh,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(nhanNut),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 500.ms);
+  }
+
+  Widget _xayDungTabCongThuc() {
+    if (_danhSachCongThucCuaTacGia.isEmpty) {
+      return _xayDungKhongCoDuLieu(
+        '${widget.tenNguoiDung} chưa có công thức nào',
+        'Hãy theo dõi để nhận thông báo khi có công thức mới',
+        Icons.restaurant_menu,
+        'Theo Dõi',
+        _toggleTheoDoi,
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.75,
+      ),
+      itemCount: _danhSachCongThucCuaTacGia.length,
+      itemBuilder: (context, index) {
+        final congThuc = _danhSachCongThucCuaTacGia[index];
+        return _xayDungTheCongThuc(congThuc, index);
+      },
+    );
+  }
+
+  Widget _xayDungTheCongThuc(CongThuc congThuc, int index) {
+    return GestureDetector(
+      onTap: () async {
+        // Tăng lượt xem khi người dùng xem chi tiết công thức
+        await _dichVuCongThuc.tangLuotXem(congThuc.ma);
+        
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ManHinhChiTietCongThuc(congThuc: congThuc),
+          ),
+        );
+
+        // Refresh nếu có thay đổi (xóa bài)
+        if (result == true) {
+          _taiDanhSachCongThucCuaTacGia();
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(10),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Hình ảnh công thức
+            Expanded(
+              flex: 3,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Stack(
+                  children: [
+                    // Hình ảnh chính
+                    ClipRRect(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: _xayDungHinhAnhCongThuc(congThuc.hinhAnh),
+                    ),
+                    // Gradient overlay
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(16)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withAlpha(100),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Rating
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withAlpha(150),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              congThuc.diemDanhGia.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Time
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withAlpha(150),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.access_time,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${congThuc.thoiGianNau}p',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Thông tin công thức
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      congThuc.tenMon,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      congThuc.loai,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: ChuDe.mauChuPhu,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () async {
+                            final nguoiDungHienTai = context.read<DangKiDangNhapEmail>().nguoiDungHienTai;
+                            if (nguoiDungHienTai == null) return;
+                            
+                            if (congThuc.daThich) {
+                              // Bỏ thích
+                              final thanhCong = await _dichVuCongThuc.boThichCongThuc(
+                                congThuc.ma, 
+                                nguoiDungHienTai.ma
+                              );
+                              
+                              if (thanhCong) {
+                                setState(() {
+                                  congThuc.daThich = false;
+                                  congThuc.luotThich = congThuc.luotThich > 0 ? congThuc.luotThich - 1 : 0;
+                                });
+                              }
+                            } else {
+                              // Thích
+                              final thanhCong = await _dichVuCongThuc.thichCongThuc(
+                                congThuc.ma, 
+                                nguoiDungHienTai.ma
+                              );
+                              
+                              if (thanhCong) {
+                                setState(() {
+                                  congThuc.daThich = true;
+                                  congThuc.luotThich = congThuc.luotThich + 1;
+                                });
+                              }
+                            }
+                          },
+                          child: Icon(
+                            Icons.favorite,
+                            color: congThuc.daThich ? Colors.red : Colors.grey,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${congThuc.luotThich}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: ChuDe.mauChuPhu,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${congThuc.luotXem} lượt xem',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: ChuDe.mauChuPhu,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 500.ms, delay: (index * 100).ms);
+  }
+
+  Widget _xayDungHinhAnhCongThuc(String duongDanHinhAnh) {
+    // Kiểm tra xem hình ảnh có phải là file local không
+    if (duongDanHinhAnh.startsWith('/')) {
+      // Đây là file local
+      final file = File(duongDanHinhAnh);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (context, error, stackTrace) {
+            return _xayDungHinhAnhMacDinh();
+          },
+        );
+      } else {
+        return _xayDungHinhAnhMacDinh();
+      }
+    } else if (duongDanHinhAnh.startsWith('assets/')) {
+      // Đây là asset
+      return Image.asset(
+        duongDanHinhAnh,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return _xayDungHinhAnhMacDinh();
+        },
+      );
+    } else if (duongDanHinhAnh.startsWith('http')) {
+      // Đây là URL
+      return Image.network(
+        duongDanHinhAnh,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return _xayDungHinhAnhMacDinh();
+        },
+      );
+    } else {
+      return _xayDungHinhAnhMacDinh();
+    }
+  }
+
+  Widget _xayDungHinhAnhMacDinh() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.grey[300],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.restaurant,
+            size: 40,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Hình ảnh\nkhông có sẵn',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+
+  _SliverAppBarDelegate(this.tabBar);
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Colors.white,
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }
