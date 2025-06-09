@@ -4,6 +4,9 @@ import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/tin_nhan.dart';
 import 'package:do_an/dich_vu/dich_vu_tin_nhan.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
+import 'package:provider/provider.dart';
+import 'dart:async';
 
 class ManHinhChiTietTinNhan extends StatefulWidget {
   final String maNguoiKhac;
@@ -32,13 +35,14 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
   late AnimationController _messageController;
 
   List<TinNhan> _danhSachTinNhan = [];
-  Map<String, dynamic> _thongTinNguoiDung = {};
+  StreamSubscription<List<TinNhan>>? _tinNhanSubscription;
 
   bool _dangGui = false;
   bool _dangNhap = false;
   String? _maCuocTroChuyenId;
+  String? _maNguoiDungHienTai;
 
-  final List<String> _quickReactions = ['❤️', '😂', '👍', '😮', '😢', '😡'];
+  final List<String> _quickReactions = ['👋', '❤️', '😂', '👍', '😮', '😢'];
 
   @override
   void initState() {
@@ -52,9 +56,10 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
       vsync: this,
     );
 
-    _khoiTaoCuocTroChuyenId();
-    _taiThongTinNguoiDung();
-    _taiTinNhan();
+    // Gọi _khoiTao() sau khi build context hoàn tất
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _khoiTao();
+    });
 
     _focusNode.addListener(_onFocusChange);
     _tinNhanController.addListener(_onTextChange);
@@ -62,6 +67,7 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
 
   @override
   void dispose() {
+    _tinNhanSubscription?.cancel();
     _inputController.dispose();
     _messageController.dispose();
     _tinNhanController.dispose();
@@ -84,31 +90,43 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
     });
   }
 
-  void _khoiTaoCuocTroChuyenId() {
-    _maCuocTroChuyenId =
-        _dichVuTinNhan.taoMaCuocTroChuyenId('current_user', widget.maNguoiKhac);
+  void _khoiTao() {
+    final nguoiDungHienTai = context.read<DangKiDangNhapEmail>().nguoiDungHienTai;
+    if (nguoiDungHienTai != null) {
+      setState(() {
+        _maNguoiDungHienTai = nguoiDungHienTai.ma;
+        _maCuocTroChuyenId = _dichVuTinNhan.taoMaCuocTroChuyenId(
+          nguoiDungHienTai.ma, 
+          widget.maNguoiKhac
+        );
+      });
+      
+      // Gọi các hàm mà không gán kết quả
+      _langNgheTinNhan();
+      _danhDauDaDoc();
+    }
   }
 
-  void _taiThongTinNguoiDung() {
-    _thongTinNguoiDung =
-        _dichVuTinNhan.layThongTinNguoiDung(widget.maNguoiKhac);
-  }
-
-  Future<void> _taiTinNhan() async {
+  void _langNgheTinNhan() {
     if (_maCuocTroChuyenId != null) {
-      try {
-        final danhSach = await _dichVuTinNhan
-            .layTinNhanTrongCuocTroChuyenId(_maCuocTroChuyenId!);
-        setState(() {
-          _danhSachTinNhan = danhSach;
-        });
+      _tinNhanSubscription?.cancel(); // Hủy subscription cũ nếu có
+      _tinNhanSubscription = _dichVuTinNhan
+          .langNgheTinNhan(_maCuocTroChuyenId!)
+          .listen((danhSachTinNhan) {
+        if (mounted) {
+          setState(() {
+            _danhSachTinNhan = danhSachTinNhan;
+          });
+          _cuonXuongCuoi();
+          _messageController.forward();
+        }
+      });
+    }
+  }
 
-        await _dichVuTinNhan.danhDauDaDoc(_maCuocTroChuyenId!, 'current_user');
-        _cuonXuongCuoi();
-        _messageController.forward();
-      } catch (e) {
-        debugPrint('Lỗi tải tin nhắn: $e');
-      }
+  void _danhDauDaDoc() {
+    if (_maCuocTroChuyenId != null && _maNguoiDungHienTai != null) {
+      _dichVuTinNhan.danhDauDaDoc(_maCuocTroChuyenId!, _maNguoiDungHienTai!);
     }
   }
 
@@ -126,52 +144,51 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
 
   Future<void> _guiTinNhan({String? noiDung, String loai = 'text'}) async {
     final content = noiDung ?? _tinNhanController.text.trim();
-    if (content.isEmpty || _dangGui) return;
+    if (content.isEmpty || _dangGui || _maNguoiDungHienTai == null) return;
 
     setState(() => _dangGui = true);
-
-    // Haptic feedback
     HapticFeedback.lightImpact();
 
     try {
-      final tinNhanMoi = TinNhan(
-        ma: DateTime.now().millisecondsSinceEpoch.toString(),
-        maNguoiGui: 'current_user',
-        tenNguoiGui: 'Bạn',
-        anhNguoiGui: 'https://i.pravatar.cc/150?img=50',
+      final nguoiDungHienTai = context.read<DangKiDangNhapEmail>().nguoiDungHienTai!;
+      
+      // Gọi hàm gửi tin nhắn mà không gán kết quả
+      await _dichVuTinNhan.guiTinNhan(
+        maNguoiGui: nguoiDungHienTai.ma,
+        tenNguoiGui: nguoiDungHienTai.hoTen,
+        anhNguoiGui: nguoiDungHienTai.anhDaiDien,
         maNguoiNhan: widget.maNguoiKhac,
         tenNguoiNhan: widget.tenNguoiKhac,
         anhNguoiNhan: widget.anhNguoiKhac,
         noiDung: content,
         loai: loai,
-        thoiGian: DateTime.now(),
-        daDoc: false,
       );
 
-      setState(() {
-        _danhSachTinNhan.add(tinNhanMoi);
-      });
-
+      // Nếu không có exception thì coi như thành công
       if (loai == 'text') {
         _tinNhanController.clear();
       }
-
       _cuonXuongCuoi();
+      
     } catch (e) {
       debugPrint('Lỗi gửi tin nhắn: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Lỗi gửi tin nhắn. Vui lòng thử lại.'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
-            ),
-          ),
-        );
-      }
+      _hienThiLoi('Lỗi gửi tin nhắn. Vui lòng thử lại.');
     } finally {
       setState(() => _dangGui = false);
+    }
+  }
+
+  void _hienThiLoi(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
+          ),
+        ),
+      );
     }
   }
 
@@ -187,7 +204,7 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
                 ? _xayDungManHinhTrong()
                 : _xayDungDanhSachTinNhan(),
           ),
-          _xayDungQuickReactions(),
+          if (_danhSachTinNhan.isEmpty) _xayDungQuickReactions(),
           _xayDungThanhNhapTinNhan(),
         ],
       ),
@@ -317,33 +334,7 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
               color: ChuDe.mauChu,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _thongTinNguoiDung['username'] ?? '@unknown',
-            style: const TextStyle(
-              fontSize: 16,
-              color: ChuDe.mauChuPhu,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
-              boxShadow: ChuDe.shadowCard,
-            ),
-            child: Text(
-              '${_thongTinNguoiDung['following']} đang follow • ${_thongTinNguoiDung['followers']} follower',
-              style: const TextStyle(
-                fontSize: 14,
-                color: ChuDe.mauChuPhu,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -385,7 +376,7 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
       itemCount: _danhSachTinNhan.length,
       itemBuilder: (context, index) {
         final tinNhan = _danhSachTinNhan[index];
-        final laTinNhanCuaToi = tinNhan.maNguoiGui == 'current_user';
+        final laTinNhanCuaToi = tinNhan.maNguoiGui == _maNguoiDungHienTai;
         return _xayDungTinNhan(tinNhan, laTinNhanCuaToi, index);
       },
     );
@@ -485,8 +476,6 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
   }
 
   Widget _xayDungQuickReactions() {
-    if (_danhSachTinNhan.isNotEmpty) return const SizedBox.shrink();
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
@@ -498,16 +487,6 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
-              boxShadow: ChuDe.shadowCard,
-            ),
-            child: const Text('👋', style: TextStyle(fontSize: 48)),
           ),
           const SizedBox(height: 16),
           Row(
@@ -674,51 +653,9 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            Text(
-              _thongTinNguoiDung['username'] ?? '@unknown',
-              style: const TextStyle(
-                fontSize: 16,
-                color: ChuDe.mauChuPhu,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _xayDungThongSo(
-                  'Following',
-                  _thongTinNguoiDung['following'].toString(),
-                ),
-                _xayDungThongSo(
-                  'Followers',
-                  _thongTinNguoiDung['followers'].toString(),
-                ),
-              ],
-            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _xayDungThongSo(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: ChuDe.mauChuPhu,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 
@@ -759,12 +696,6 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
               icon: Icons.notifications_off_rounded,
               title: 'Tắt thông báo',
               onTap: () => Navigator.pop(context),
-            ),
-            _xayDungTuyChonMenu(
-              icon: Icons.block_rounded,
-              title: 'Chặn người dùng',
-              onTap: () => Navigator.pop(context),
-              isDestructive: true,
             ),
             const SizedBox(height: 20),
           ],
@@ -836,7 +767,6 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
                   color: Colors.purple,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Mở camera
                   },
                 ),
                 _xayDungTuyChonDinhKem(
@@ -845,7 +775,6 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
                   color: Colors.blue,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Mở thư viện ảnh
                   },
                 ),
                 _xayDungTuyChonDinhKem(
@@ -854,40 +783,6 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
                   color: ChuDe.mauChinh,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Chia sẻ công thức
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _xayDungTuyChonDinhKem(
-                  icon: Icons.location_on_rounded,
-                  label: 'Vị trí',
-                  color: Colors.green,
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Chia sẻ vị trí
-                  },
-                ),
-                _xayDungTuyChonDinhKem(
-                  icon: Icons.mic_rounded,
-                  label: 'Ghi âm',
-                  color: Colors.orange,
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Ghi âm
-                  },
-                ),
-                _xayDungTuyChonDinhKem(
-                  icon: Icons.insert_drive_file_rounded,
-                  label: 'Tệp tin',
-                  color: Colors.grey,
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Chọn tệp tin
                   },
                 ),
               ],
