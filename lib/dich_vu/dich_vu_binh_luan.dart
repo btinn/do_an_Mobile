@@ -1,10 +1,12 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:do_an/mo_hinh/binh_luan.dart';
+import 'package:do_an/dich_vu/dich_vu_thong_bao.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
 
 class DichVuBinhLuan {
   final _db = FirebaseDatabase.instance.ref();
+  final DichVuThongBao _dichVuThongBao = DichVuThongBao();
 
   // Thêm bình luận mới
   Future<bool> themBinhLuan({
@@ -33,6 +35,24 @@ class DichVuBinhLuan {
 
       // Cập nhật số lượng bình luận trong công thức
       await _capNhatSoLuongBinhLuan(maCongThuc);
+
+      // Lấy thông tin công thức để gửi thông báo
+      final congThucSnapshot = await _db.child('cong_thuc/$maCongThuc').get();
+      if (congThucSnapshot.exists) {
+        final congThucData = Map<String, dynamic>.from(congThucSnapshot.value as Map);
+        final tacGiaUid = congThucData['uid'] as String;
+        final tenCongThuc = congThucData['tenMon'] as String;
+        
+        // Gửi thông báo cho tác giả công thức
+        await _dichVuThongBao.taoThongBaoBinhLuan(
+          maNguoiNhan: tacGiaUid,
+          maNguoiGui: uid,
+          tenNguoiGui: hoTen,
+          maCongThuc: maCongThuc,
+          tenCongThuc: tenCongThuc,
+          noiDungBinhLuan: noiDung,
+        );
+      }
 
       developer.log('Đã thêm bình luận thành công: $maBinhLuan');
       return true;

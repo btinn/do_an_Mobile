@@ -1,5 +1,3 @@
-import 'package:do_an/mo_hinh/binh_luan.dart';
-
 class CongThuc {
   final String ma;
   final String tenMon;
@@ -7,17 +5,17 @@ class CongThuc {
   final String loai;
   final int thoiGianNau;
   final int khauPhan;
-  double diemDanhGia;
+  final double diemDanhGia;
   int luotThich;
   final int luotXem;
   final List<String> nguyenLieu;
   final List<String> cachLam;
   final String tacGia;
   final String anhTacGia;
-  final String uid; // ✅ thêm uid tác giả nếu cần
+  final String uid;
   bool daThich;
-  final List<BinhLuan> danhSachBinhLuan;
   final List<double> danhSachDanhGia;
+  final List<dynamic> danhSachBinhLuan;
 
   CongThuc({
     required this.ma,
@@ -35,33 +33,118 @@ class CongThuc {
     required this.anhTacGia,
     required this.uid,
     required this.daThich,
-    required this.danhSachBinhLuan,
     required this.danhSachDanhGia,
+    required this.danhSachBinhLuan,
   });
 
-  /// ✅ Tạo từ Firebase snapshot
-  factory CongThuc.fromMap(Map<dynamic, dynamic> data,
-      {required bool daThich}) {
+  // Factory constructor để tạo từ Map
+  factory CongThuc.fromMap(Map<String, dynamic> map, {required String ma, required bool daThich}) {
     return CongThuc(
-      ma: data['ma']?.toString() ?? '',
-      tenMon: data['tenMon'] ?? '',
-      hinhAnh: data['hinhAnh'] ?? '',
-      loai: data['loai'] ?? '',
-      thoiGianNau: data['thoiGianNau'] ?? 0,
-      khauPhan: data['khauPhan'] ?? 0,
-      diemDanhGia: (data['diemDanhGia'] ?? 0).toDouble(),
-      luotThich: data['luotThich'] ?? 0,
-      luotXem: data['luotXem'] ?? 0,
-      nguyenLieu: List<String>.from(data['nguyenLieu'] ?? []),
-      cachLam: List<String>.from(data['cachLam'] ?? []),
-      tacGia: data['tacGia'] ?? '',
-      anhTacGia: data['anhTacGia'] ?? '',
-      uid: data['uid'] ?? '',
-      daThich: daThich, // ✅ dùng giá trị tính toán từ Firebase `tym`
-      danhSachBinhLuan: [],
+      ma: ma,
+      tenMon: map['tenMon'] ?? '',
+      hinhAnh: map['hinhAnh'] ?? '',
+      loai: map['loai'] ?? '',
+      thoiGianNau: map['thoiGianNau'] ?? 0,
+      khauPhan: map['khauPhan'] ?? 0,
+      diemDanhGia: (map['diemDanhGia'] ?? 0).toDouble(),
+      luotThich: map['luotThich'] ?? 0,
+      luotXem: map['luotXem'] ?? 0,
+      nguyenLieu: List<String>.from(map['nguyenLieu'] ?? []),
+      cachLam: List<String>.from(map['cachLam'] ?? []),
+      tacGia: map['tacGia'] ?? '',
+      anhTacGia: map['anhTacGia'] ?? '',
+      uid: map['uid'] ?? '',
+      daThich: daThich,
       danhSachDanhGia: List<double>.from(
-        (data['danhSachDanhGia'] ?? []).map((e) => (e as num).toDouble()),
+        (map['danhSachDanhGia'] ?? []).map((e) => (e as num).toDouble()),
       ),
+      danhSachBinhLuan: map['danhSachBinhLuan'] ?? [],
+    );
+  }
+
+  // Factory constructor để tạo empty object
+  factory CongThuc.empty() {
+    return CongThuc(
+      ma: '',
+      tenMon: '',
+      hinhAnh: '',
+      loai: '',
+      thoiGianNau: 0,
+      khauPhan: 0,
+      diemDanhGia: 0.0,
+      luotThich: 0,
+      luotXem: 0,
+      nguyenLieu: [],
+      cachLam: [],
+      tacGia: '',
+      anhTacGia: '',
+      uid: '',
+      daThich: false,
+      danhSachDanhGia: [],
+      danhSachBinhLuan: [],
+    );
+  }
+
+  // Chuyển đổi thành Map để lưu vào Firebase
+  Map<String, dynamic> toMap() {
+    return {
+      'ma': ma,
+      'tenMon': tenMon,
+      'hinhAnh': hinhAnh,
+      'loai': loai,
+      'thoiGianNau': thoiGianNau,
+      'khauPhan': khauPhan,
+      'diemDanhGia': diemDanhGia,
+      'luotThich': luotThich,
+      'luotXem': luotXem,
+      'nguyenLieu': nguyenLieu,
+      'cachLam': cachLam,
+      'tacGia': tacGia,
+      'anhTacGia': anhTacGia,
+      'uid': uid,
+      'danhSachDanhGia': danhSachDanhGia,
+      'danhSachBinhLuan': danhSachBinhLuan,
+    };
+  }
+
+  // Copy with method
+  CongThuc copyWith({
+    String? ma,
+    String? tenMon,
+    String? hinhAnh,
+    String? loai,
+    int? thoiGianNau,
+    int? khauPhan,
+    double? diemDanhGia,
+    int? luotThich,
+    int? luotXem,
+    List<String>? nguyenLieu,
+    List<String>? cachLam,
+    String? tacGia,
+    String? anhTacGia,
+    String? uid,
+    bool? daThich,
+    List<double>? danhSachDanhGia,
+    List<dynamic>? danhSachBinhLuan,
+  }) {
+    return CongThuc(
+      ma: ma ?? this.ma,
+      tenMon: tenMon ?? this.tenMon,
+      hinhAnh: hinhAnh ?? this.hinhAnh,
+      loai: loai ?? this.loai,
+      thoiGianNau: thoiGianNau ?? this.thoiGianNau,
+      khauPhan: khauPhan ?? this.khauPhan,
+      diemDanhGia: diemDanhGia ?? this.diemDanhGia,
+      luotThich: luotThich ?? this.luotThich,
+      luotXem: luotXem ?? this.luotXem,
+      nguyenLieu: nguyenLieu ?? this.nguyenLieu,
+      cachLam: cachLam ?? this.cachLam,
+      tacGia: tacGia ?? this.tacGia,
+      anhTacGia: anhTacGia ?? this.anhTacGia,
+      uid: uid ?? this.uid,
+      daThich: daThich ?? this.daThich,
+      danhSachDanhGia: danhSachDanhGia ?? this.danhSachDanhGia,
+      danhSachBinhLuan: danhSachBinhLuan ?? this.danhSachBinhLuan,
     );
   }
 }

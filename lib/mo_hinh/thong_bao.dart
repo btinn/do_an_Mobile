@@ -3,13 +3,16 @@ class ThongBao {
   final String maNguoiNhan;
   final String maNguoiGui;
   final String tenNguoiGui;
-  final String loai; // 'thich', 'binh_luan', 'theo_doi'
+  final String loai; // 'thich', 'binh_luan', 'theo_doi', 'danh_gia'
   final String tieuDe;
   final String noiDung;
   final String? maCongThuc;
   final String? tenCongThuc;
   final int thoiGian;
   bool daDoc;
+  final double? diemDanhGia; // Cho thông báo đánh giá
+  final String? noiDungBinhLuan; // Cho thông báo bình luận
+  final String? anhDaiDienNguoiGui; // Cho thông báo theo dõi
 
   ThongBao({
     required this.ma,
@@ -23,6 +26,9 @@ class ThongBao {
     this.tenCongThuc,
     required this.thoiGian,
     required this.daDoc,
+    this.diemDanhGia,
+    this.noiDungBinhLuan,
+    this.anhDaiDienNguoiGui,
   });
 
   factory ThongBao.fromMap(Map<dynamic, dynamic> map) {
@@ -38,7 +44,29 @@ class ThongBao {
       tenCongThuc: map['tenCongThuc'],
       thoiGian: map['thoiGian'] ?? 0,
       daDoc: map['daDoc'] ?? false,
+      diemDanhGia: map['diemDanhGia']?.toDouble(),
+      noiDungBinhLuan: map['noiDungBinhLuan'],
+      anhDaiDienNguoiGui: map['anhDaiDienNguoiGui'],
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'ma': ma,
+      'maNguoiNhan': maNguoiNhan,
+      'maNguoiGui': maNguoiGui,
+      'tenNguoiGui': tenNguoiGui,
+      'loai': loai,
+      'tieuDe': tieuDe,
+      'noiDung': noiDung,
+      'maCongThuc': maCongThuc,
+      'tenCongThuc': tenCongThuc,
+      'thoiGian': thoiGian,
+      'daDoc': daDoc,
+      'diemDanhGia': diemDanhGia,
+      'noiDungBinhLuan': noiDungBinhLuan,
+      'anhDaiDienNguoiGui': anhDaiDienNguoiGui,
+    };
   }
 
   String get thoiGianHienThi {
@@ -56,6 +84,36 @@ class ThongBao {
       return '${difference.inDays} ngày trước';
     } else {
       return '${difference.inDays ~/ 7} tuần trước';
+    }
+  }
+
+  String get iconThongBao {
+    switch (loai) {
+      case 'thich':
+        return '❤️';
+      case 'binh_luan':
+        return '💬';
+      case 'theo_doi':
+        return '👥';
+      case 'danh_gia':
+        return '⭐';
+      default:
+        return '🔔';
+    }
+  }
+
+  String get mauThongBao {
+    switch (loai) {
+      case 'thich':
+        return 'red';
+      case 'binh_luan':
+        return 'blue';
+      case 'theo_doi':
+        return 'green';
+      case 'danh_gia':
+        return 'orange';
+      default:
+        return 'grey';
     }
   }
 }

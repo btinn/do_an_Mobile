@@ -41,7 +41,8 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
       vsync: this,
     );
 
-    _taiDuLieu();
+    setState(() => _dangTai = true);
+    _taiDuLieuRealTime(); // Thay vì _taiDuLieu()
     _scrollController.addListener(_onScroll);
   }
 
@@ -62,21 +63,15 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
     }
   }
 
-  Future<void> _taiDuLieu() async {
-    setState(() => _dangTai = true);
-
-    try {
-      final danhSachCuocTroChuyenTomTat =
-          await _dichVuTinNhan.layDanhSachCuocTroChuyenTomTat('current_user');
-
-      setState(() {
-        _danhSachCuocTroChuyenTomTat = danhSachCuocTroChuyenTomTat;
-      });
-    } catch (e) {
-      debugPrint('Lỗi tải dữ liệu: $e');
-    } finally {
-      setState(() => _dangTai = false);
-    }
+  void _taiDuLieuRealTime() {
+    _dichVuTinNhan.langNgheCuocTroChuyenTomTat('current_user').listen((danhSach) {
+      if (mounted) {
+        setState(() {
+          _danhSachCuocTroChuyenTomTat = danhSach;
+          _dangTai = false;
+        });
+      }
+    });
   }
 
   void _timKiem(String query) {
@@ -432,6 +427,24 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
         .slideX(begin: 0.2, end: 0);
   }
 
+  Widget _xayDungTrangThaiOnline(String maNguoiKhac) {
+    return StreamBuilder<bool>(
+      stream: _dichVuTinNhan.langNgheTrangThaiOnline(maNguoiKhac),
+      builder: (context, snapshot) {
+        final isOnline = snapshot.data ?? false;
+        return Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: isOnline ? ChuDe.mauOnline : Colors.grey,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _xayDungAvatar(CuocTroChuyenTomTat cuocTroChuyenTomTat) {
     return Stack(
       children: [
@@ -452,20 +465,11 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
             backgroundImage: NetworkImage(cuocTroChuyenTomTat.anhNguoiKhac),
           ),
         ),
-        if (cuocTroChuyenTomTat.dangOnline)
-          Positioned(
-            bottom: 2,
-            right: 2,
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: ChuDe.mauOnline,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-            ),
-          ),
+        Positioned(
+          bottom: 2,
+          right: 2,
+          child: _xayDungTrangThaiOnline(cuocTroChuyenTomTat.maNguoiKhac),
+        ),
       ],
     );
   }

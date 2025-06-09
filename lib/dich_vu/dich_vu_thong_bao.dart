@@ -1,36 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:do_an/mo_hinh/thong_bao.dart';
+import 'package:flutter/foundation.dart';
 
 class DichVuThongBao {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _db = FirebaseDatabase.instance.ref();
 
-  Future<void> taoThongBaoDanhGia({
-    required String maNguoiNhan,
-    required String maNguoiGui,
-    required String tenNguoiGui,
-    required String maCongThuc,
-    required String tenCongThuc,
-  }) async {
-    final thongBao = {
-      'ma': DateTime.now().millisecondsSinceEpoch.toString(),
-      'maNguoiNhan': maNguoiNhan,
-      'maNguoiGui': maNguoiGui,
-      'tenNguoiGui': tenNguoiGui,
-      'loai': 'danh_gia',
-      'tieuDe': 'Ai đó đã đánh giá công thức của bạn',
-      'noiDung': '$tenNguoiGui đã đánh giá "$tenCongThuc" của bạn',
-      'maCongThuc': maCongThuc,
-      'tenCongThuc': tenCongThuc,
-      'thoiGian': DateTime.now().millisecondsSinceEpoch,
-      'daDoc': false,
-    };
-
-    await _db.child('thong_bao').child(maNguoiNhan).push().set(thongBao);
-  }
-
-  // Tạo thông báo khi có người thích công thức
+  // Tạo thông báo khi ai đó thích công thức
   Future<void> taoThongBaoThich({
     required String maNguoiNhan,
     required String maNguoiGui,
@@ -38,24 +13,29 @@ class DichVuThongBao {
     required String maCongThuc,
     required String tenCongThuc,
   }) async {
-    final thongBao = {
-      'ma': DateTime.now().millisecondsSinceEpoch.toString(),
-      'maNguoiNhan': maNguoiNhan,
-      'maNguoiGui': maNguoiGui,
-      'tenNguoiGui': tenNguoiGui,
-      'loai': 'thich',
-      'tieuDe': 'Ai đó đã thích công thức của bạn',
-      'noiDung': '$tenNguoiGui đã thích công thức "$tenCongThuc" của bạn',
-      'maCongThuc': maCongThuc,
-      'tenCongThuc': tenCongThuc,
-      'thoiGian': DateTime.now().millisecondsSinceEpoch,
-      'daDoc': false,
-    };
+    // Không gửi thông báo cho chính mình
+    if (maNguoiNhan == maNguoiGui) return;
 
-    await _db.child('thong_bao').child(maNguoiNhan).push().set(thongBao);
+    try {
+      final thongBaoRef = _db.child('thong_bao/$maNguoiNhan').push();
+      
+      await thongBaoRef.set({
+        'ma': thongBaoRef.key,
+        'maNguoiNhan': maNguoiNhan,
+        'maNguoiGui': maNguoiGui,
+        'loai': 'thich',
+        'tieuDe': 'Có người thích công thức của bạn',
+        'noiDung': '$tenNguoiGui đã thích công thức "$tenCongThuc" của bạn',
+        'maCongThuc': maCongThuc,
+        'daDoc': false,
+        'thoiGian': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      debugPrint('Lỗi tạo thông báo thích: $e');
+    }
   }
 
-  // Tạo thông báo khi có người bình luận
+  // Tạo thông báo khi ai đó bình luận
   Future<void> taoThongBaoBinhLuan({
     required String maNguoiNhan,
     required String maNguoiGui,
@@ -64,150 +44,241 @@ class DichVuThongBao {
     required String tenCongThuc,
     required String noiDungBinhLuan,
   }) async {
-    final thongBao = {
-      'ma': DateTime.now().millisecondsSinceEpoch.toString(),
-      'maNguoiNhan': maNguoiNhan,
-      'maNguoiGui': maNguoiGui,
-      'tenNguoiGui': tenNguoiGui,
-      'loai': 'binh_luan',
-      'tieuDe': 'Bình luận mới',
-      'noiDung':
-          '$tenNguoiGui đã bình luận: "${noiDungBinhLuan.length > 50 ? noiDungBinhLuan.substring(0, 50) + '...' : noiDungBinhLuan}"',
-      'maCongThuc': maCongThuc,
-      'tenCongThuc': tenCongThuc,
-      'thoiGian': DateTime.now().millisecondsSinceEpoch,
-      'daDoc': false,
-    };
+    // Không gửi thông báo cho chính mình
+    if (maNguoiNhan == maNguoiGui) return;
 
-    await _db.child('thong_bao').child(maNguoiNhan).push().set(thongBao);
-  }
-
-  // Lấy danh sách thông báo của người dùng
-  Future<List<ThongBao>> layDanhSachThongBao(String maNguoiDung) async {
-    final snapshot = await _db.child('thong_bao').child(maNguoiDung).get();
-
-    if (!snapshot.exists) return [];
-
-    final List<ThongBao> danhSach = [];
-
-    for (final child in snapshot.children) {
-      try {
-        final data = child.value as Map<dynamic, dynamic>?;
-        if (data == null) continue;
-
-        danhSach.add(ThongBao.fromMap(data));
-      } catch (e) {
-        print('Lỗi khi chuyển đổi thông báo: $e');
-      }
-    }
-
-    // Sắp xếp theo thời gian mới nhất
-    danhSach.sort((a, b) => b.thoiGian.compareTo(a.thoiGian));
-
-    return danhSach;
-  }
-
-  // Đánh dấu thông báo đã đọc
-  Future<void> danhDauDaDoc(String maNguoiDung, String maThongBao) async {
-    final snapshot = await _db.child('thong_bao').child(maNguoiDung).get();
-
-    if (snapshot.exists) {
-      for (final child in snapshot.children) {
-        final data = child.value as Map<dynamic, dynamic>?;
-        if (data != null && data['ma'] == maThongBao) {
-          await child.ref.update({'daDoc': true});
-          break;
-        }
-      }
+    try {
+      final thongBaoRef = _db.child('thong_bao/$maNguoiNhan').push();
+      
+      await thongBaoRef.set({
+        'ma': thongBaoRef.key,
+        'maNguoiNhan': maNguoiNhan,
+        'maNguoiGui': maNguoiGui,
+        'loai': 'binh_luan',
+        'tieuDe': 'Có bình luận mới',
+        'noiDung': '$tenNguoiGui đã bình luận: "${noiDungBinhLuan.length > 50 ? '${noiDungBinhLuan.substring(0, 50)}...' : noiDungBinhLuan}"',
+        'maCongThuc': maCongThuc,
+        'daDoc': false,
+        'thoiGian': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      debugPrint('Lỗi tạo thông báo bình luận: $e');
     }
   }
 
-  // Đánh dấu tất cả thông báo đã đọc
-  Future<void> danhDauTatCaDaDoc(String maNguoiDung) async {
-    final snapshot = await _db.child('thong_bao').child(maNguoiDung).get();
+  // Tạo thông báo khi ai đó theo dõi
+  Future<void> taoThongBaoTheoDoi({
+    required String maNguoiNhan,
+    required String maNguoiGui,
+    required String tenNguoiGui,
+  }) async {
+    // Không gửi thông báo cho chính mình
+    if (maNguoiNhan == maNguoiGui) return;
 
-    if (snapshot.exists) {
-      for (final child in snapshot.children) {
-        await child.ref.update({'daDoc': true});
-      }
+    try {
+      final thongBaoRef = _db.child('thong_bao/$maNguoiNhan').push();
+      
+      await thongBaoRef.set({
+        'ma': thongBaoRef.key,
+        'maNguoiNhan': maNguoiNhan,
+        'maNguoiGui': maNguoiGui,
+        'loai': 'theo_doi',
+        'tieuDe': 'Có người theo dõi bạn',
+        'noiDung': '$tenNguoiGui đã bắt đầu theo dõi bạn',
+        'daDoc': false,
+        'thoiGian': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      debugPrint('Lỗi tạo thông báo theo dõi: $e');
     }
   }
 
-  // Đếm số thông báo chưa đọc
-  Future<int> demThongBaoChuaDoc(String maNguoiDung) async {
-    final snapshot = await _db.child('thong_bao').child(maNguoiDung).get();
+  // Tạo thông báo khi ai đó đánh giá
+  Future<void> taoThongBaoDanhGia({
+    required String maNguoiNhan,
+    required String maNguoiGui,
+    required String tenNguoiGui,
+    required String maCongThuc,
+    required String tenCongThuc,
+    required double diemDanhGia,
+  }) async {
+    // Không gửi thông báo cho chính mình
+    if (maNguoiNhan == maNguoiGui) return;
 
-    if (!snapshot.exists) return 0;
-
-    int count = 0;
-    for (final child in snapshot.children) {
-      final data = child.value as Map<dynamic, dynamic>?;
-      if (data != null && data['daDoc'] == false) {
-        count++;
-      }
+    try {
+      final thongBaoRef = _db.child('thong_bao/$maNguoiNhan').push();
+      
+      await thongBaoRef.set({
+        'ma': thongBaoRef.key,
+        'maNguoiNhan': maNguoiNhan,
+        'maNguoiGui': maNguoiGui,
+        'loai': 'danh_gia',
+        'tieuDe': 'Có đánh giá mới',
+        'noiDung': '$tenNguoiGui đã đánh giá ${diemDanhGia.toStringAsFixed(1)} sao cho công thức "$tenCongThuc"',
+        'maCongThuc': maCongThuc,
+        'daDoc': false,
+        'thoiGian': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      debugPrint('Lỗi tạo thông báo đánh giá: $e');
     }
-
-    return count;
   }
 
-  Future<void> taoThongBaoTest(String uidNguoiNhan) async {
-    final thongBao = {
-      'ma': DateTime.now().millisecondsSinceEpoch.toString(),
-      'maNguoiNhan': uidNguoiNhan,
-      'maNguoiGui': 'test_user',
-      'tenNguoiGui': 'Tài Khoản Test',
-      'loai': 'thich',
-      'tieuDe': 'Thông báo thử nghiệm',
-      'noiDung': 'Đây là thông báo test để kiểm tra giao diện.',
-      'maCongThuc': 'CT001',
-      'tenCongThuc': 'Canh chua cá lóc',
-      'thoiGian': DateTime.now().millisecondsSinceEpoch,
-      'daDoc': false,
-    };
-
-    await _db.child('thong_bao').child(uidNguoiNhan).push().set(thongBao);
-  }
-
-  Stream<int> langNgheSoThongBaoChuaDoc(String uid) {
-    return _firestore
-        .collection('thong_bao')
-        .where('uidNguoiNhan', isEqualTo: uid)
-        .where('daDoc', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
-  }
-
-  Stream<int> demThongBaoChuaDocStream(String uid) {
-    return _firestore
-        .collection('thong_bao')
-        .where('nguoiNhan', isEqualTo: uid)
-        .where('daDoc', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
-  }
-
-  // Lắng nghe thông báo mới
-  Stream<List<ThongBao>> langNgheThongBao(String maNguoiDung) {
-    return _db.child('thong_bao').child(maNguoiDung).onValue.map((event) {
-      if (!event.snapshot.exists) return <ThongBao>[];
+  // Lấy danh sách thông báo
+  Future<List<ThongBao>> layDanhSachThongBao(String uid) async {
+    try {
+      final snapshot = await _db.child('thong_bao/$uid').get();
+      
+      if (!snapshot.exists) return [];
 
       final List<ThongBao> danhSach = [];
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
 
-      for (final child in event.snapshot.children) {
+      for (final entry in data.entries) {
         try {
-          final data = child.value as Map<dynamic, dynamic>?;
-          if (data == null) continue;
-
-          danhSach.add(ThongBao.fromMap(data));
+          final thongBaoData = Map<String, dynamic>.from(entry.value);
+          final thongBao = ThongBao.fromMap(thongBaoData);
+          danhSach.add(thongBao);
         } catch (e) {
-          print('Lỗi khi chuyển đổi thông báo: $e');
+          debugPrint('Lỗi parse thông báo ${entry.key}: $e');
         }
       }
 
       // Sắp xếp theo thời gian mới nhất
       danhSach.sort((a, b) => b.thoiGian.compareTo(a.thoiGian));
+      
+      return danhSach;
+    } catch (e) {
+      debugPrint('Lỗi lấy danh sách thông báo: $e');
+      return [];
+    }
+  }
 
+  // Lắng nghe thông báo real-time
+  Stream<List<ThongBao>> langNgheThongBao(String uid) {
+    return _db.child('thong_bao/$uid').onValue.map((event) {
+      if (!event.snapshot.exists) return <ThongBao>[];
+
+      final List<ThongBao> danhSach = [];
+      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+
+      for (final entry in data.entries) {
+        try {
+          final thongBaoData = Map<String, dynamic>.from(entry.value);
+          final thongBao = ThongBao.fromMap(thongBaoData);
+          danhSach.add(thongBao);
+        } catch (e) {
+          debugPrint('Lỗi parse thông báo ${entry.key}: $e');
+        }
+      }
+
+      // Sắp xếp theo thời gian mới nhất
+      danhSach.sort((a, b) => b.thoiGian.compareTo(a.thoiGian));
+      
       return danhSach;
     });
+  }
+
+  // Đếm số thông báo chưa đọc
+  Future<int> demThongBaoChuaDoc(String uid) async {
+    try {
+      final snapshot = await _db.child('thong_bao/$uid').get();
+      
+      if (!snapshot.exists) return 0;
+
+      int count = 0;
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+
+      for (final entry in data.entries) {
+        final thongBaoData = Map<String, dynamic>.from(entry.value);
+        if (!(thongBaoData['daDoc'] ?? false)) {
+          count++;
+        }
+      }
+
+      return count;
+    } catch (e) {
+      debugPrint('Lỗi đếm thông báo chưa đọc: $e');
+      return 0;
+    }
+  }
+
+  // Stream đếm số thông báo chưa đọc
+  Stream<int> demThongBaoChuaDocStream(String uid) {
+    return _db.child('thong_bao/$uid').onValue.map((event) {
+      if (!event.snapshot.exists) return 0;
+
+      int count = 0;
+      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+
+      for (final entry in data.entries) {
+        final thongBaoData = Map<String, dynamic>.from(entry.value);
+        if (!(thongBaoData['daDoc'] ?? false)) {
+          count++;
+        }
+      }
+
+      return count;
+    });
+  }
+
+  // Đánh dấu đã đọc
+  Future<void> danhDauDaDoc(String uid, String maThongBao) async {
+    try {
+      await _db.child('thong_bao/$uid/$maThongBao/daDoc').set(true);
+    } catch (e) {
+      debugPrint('Lỗi đánh dấu đã đọc: $e');
+    }
+  }
+
+  // Đánh dấu tất cả đã đọc
+  Future<void> danhDauTatCaDaDoc(String uid) async {
+    try {
+      final snapshot = await _db.child('thong_bao/$uid').get();
+      
+      if (!snapshot.exists) return;
+
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+      final Map<String, dynamic> updates = {};
+
+      for (final key in data.keys) {
+        updates['$key/daDoc'] = true;
+      }
+
+      await _db.child('thong_bao/$uid').update(updates);
+    } catch (e) {
+      debugPrint('Lỗi đánh dấu tất cả đã đọc: $e');
+    }
+  }
+
+  // Tạo thông báo test
+  Future<void> taoThongBaoTest(String uid) async {
+    try {
+      final thongBaoRef = _db.child('thong_bao/$uid').push();
+      
+      await thongBaoRef.set({
+        'ma': thongBaoRef.key,
+        'maNguoiNhan': uid,
+        'maNguoiGui': 'system',
+        'loai': 'test',
+        'tieuDe': 'Thông báo test',
+        'noiDung': 'Đây là thông báo test để kiểm tra hệ thống',
+        'daDoc': false,
+        'thoiGian': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      debugPrint('Lỗi tạo thông báo test: $e');
+    }
+  }
+
+  // Xóa tất cả thông báo
+  Future<void> xoaTatCaThongBao(String uid) async {
+    try {
+      await _db.child('thong_bao/$uid').remove();
+      debugPrint('Đã xóa tất cả thông báo cho user: $uid');
+    } catch (e) {
+      debugPrint('Lỗi xóa tất cả thông báo: $e');
+      rethrow;
+    }
   }
 }

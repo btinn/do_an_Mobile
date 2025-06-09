@@ -31,13 +31,18 @@ class _ManHinhChinhState extends State<ManHinhChinh> {
       ),
       const ManHinhTimKiem(),
       const ManHinhThemCongThuc(),
-      const ManHinhHopThu(), // Thay đổi từ ManHinhYeuThich thành ManHinhHopThu
-      const ManHinhHoSo(),
+      const ManHinhHopThu(),
+      const ManHinhHoSo(), // Đây là phần tử thứ 5 (index 4)
     ];
   }
 
   @override
   Widget build(BuildContext context) {
+    // Đảm bảo chỉ số hiện tại không vượt quá số lượng màn hình
+    if (_chiSoHienTai >= _manHinh.length) {
+      _chiSoHienTai = 0;
+    }
+    
     return Scaffold(
       body: _manHinh[_chiSoHienTai],
       bottomNavigationBar: Container(
