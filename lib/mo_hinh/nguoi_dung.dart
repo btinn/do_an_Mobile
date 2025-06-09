@@ -80,4 +80,19 @@ class NguoiDung {
       gioiTinh: data['gioiTinh'] ?? 'Nam',
     );
   }
+  Map<String, dynamic> toMap() {
+    return {
+      'hoTen': hoTen,
+      'email': email,
+      'anhDaiDien': anhDaiDien,
+      'moTa': moTa,
+      'soLuongCongThuc': congThucIds,
+      'soLuongNguoiTheoDoi': nguoiTheoDoiIds,
+      'soLuongDangTheoDoi': dangTheoDoiIds,
+      'soDienThoai': soDienThoai,
+      'diaChi': diaChi,
+      'ngaySinh': ngaySinh,
+      'gioiTinh': gioiTinh,
+    };
+  }
 }

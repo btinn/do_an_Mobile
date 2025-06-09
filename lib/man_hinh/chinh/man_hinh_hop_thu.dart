@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:do_an/giao_dien/chu_de.dart';
-import 'package:do_an/mo_hinh/tin_nhan.dart';
 import 'package:do_an/dich_vu/dich_vu_tin_nhan.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_tin_nhan.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:do_an/mo_hinh/cuoc_tro_chuyen_tom_tat.dart';
 
 class ManHinhHopThu extends StatefulWidget {
   const ManHinhHopThu({super.key});
@@ -359,7 +359,7 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
           children: [
             Expanded(
               child: Text(
-                cuocTroChuyenTomTat.tenNguoiKhac,
+                cuocTroChuyenTomTat?.tenNguoiKhac ?? '',
                 style: TextStyle(
                   fontWeight: cuocTroChuyenTomTat.soTinNhanChuaDoc > 0
                       ? FontWeight.bold
@@ -545,7 +545,7 @@ class _ManHinhHopThuState extends State<ManHinhHopThu>
       case 'file':
         return '📎 Tệp đính kèm';
       default:
-        return cuocTroChuyenTomTat.tinNhanCuoi;
+        return cuocTroChuyenTomTat?.tinNhanCuoi ?? '';
     }
   }
 

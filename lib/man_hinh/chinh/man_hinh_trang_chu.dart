@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:do_an/dich_vu/dich_vu_cong_thuc.dart';
 import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:do_an/dich_vu/dich_vu_thong_bao.dart';
@@ -88,7 +90,11 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
 
     try {
       final dichVu = DichVuCongThuc();
-      final danhSach = await dichVu.layDanhSachCongThuc();
+      final uid = Provider.of<DangKiDangNhapEmail>(context, listen: false)
+              .nguoiDungHienTai
+              ?.ma ??
+          '';
+      final danhSach = await dichVu.layDanhSachCongThuc(uid);
 
       setState(() {
         danhSachCongThuc = danhSach;
@@ -208,42 +214,68 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                 ],
               ),
               actions: [
-                IconButton(
-                  icon: Stack(
-                    children: [
-                      const Icon(Icons.notifications_outlined,
-                          color: ChuDe.mauChu),
-                      if (_soThongBaoChuaDoc > 0)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: ChuDe.mauChinh,
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 14,
-                              minHeight: 14,
-                            ),
-                            child: Text(
-                              _soThongBaoChuaDoc > 99
-                                  ? '99+'
-                                  : _soThongBaoChuaDoc.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
+                StreamBuilder<int>(
+                  stream: _dichVuThongBao.demThongBaoChuaDocStream(
+                    Provider.of<DangKiDangNhapEmail>(context, listen: false)
+                        .nguoiDungHienTai!
+                        .ma,
                   ),
-                  onPressed: () {
-                    _hienThiDanhSachThongBao();
+                  builder: (context, snapshot) {
+                    final soChuaDoc = snapshot.data ?? 0;
+
+                    return IconButton(
+                      icon: Stack(
+                        children: [
+                          const Icon(Icons.notifications_outlined,
+                              color: ChuDe.mauChu),
+                          if (soChuaDoc > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: ChuDe.mauChinh,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 14,
+                                  minHeight: 14,
+                                ),
+                                child: Text(
+                                  soChuaDoc > 99 ? '99+' : soChuaDoc.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      onPressed: _hienThiDanhSachThongBao,
+                    );
+                  },
+                ),
+                //-------------------------
+                IconButton(
+                  icon: const Icon(Icons.bug_report, color: Colors.deepOrange),
+                  tooltip: 'Test thông báo',
+                  onPressed: () async {
+                    final uid =
+                        Provider.of<DangKiDangNhapEmail>(context, listen: false)
+                            .nguoiDungHienTai
+                            ?.ma;
+
+                    if (uid != null) {
+                      await _dichVuThongBao.taoThongBaoTest(uid);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Thông báo test đã được gửi')),
+                      );
+                    }
                   },
                 ),
               ],
@@ -579,8 +611,8 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) =>
-                    ManHinhChiTietCongThuc(congThuc: congThuc),
+                builder: (context) => ManHinhChiTietCongThuc(
+                    congThuc: congThuc, taiLaiCongThuc: _taiCongThuc),
               ),
             );
           }
@@ -720,8 +752,8 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                     context,
                     MaterialPageRoute(
                       builder: (context) => ManHinhChiTietCongThuc(
-                        congThuc: danhSachLoc[index],
-                      ),
+                          congThuc: danhSachLoc[index],
+                          taiLaiCongThuc: _taiCongThuc),
                     ),
                   );
                 },
@@ -753,6 +785,7 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                 MaterialPageRoute(
                   builder: (context) => ManHinhChiTietCongThuc(
                     congThuc: danhSachCongThuc[index],
+                    taiLaiCongThuc: _taiCongThuc,
                   ),
                 ),
               );
@@ -775,22 +808,8 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
         final congThuc = danhSachCongThuc[index];
 
         // Xử lý ảnh món ăn
-        Image imageWidget;
-        if (congThuc.hinhAnh.startsWith('http')) {
-          imageWidget = Image.network(
-            congThuc.hinhAnh,
-            height: 200,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          );
-        } else {
-          imageWidget = Image.asset(
-            congThuc.hinhAnh,
-            height: 200,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          );
-        }
+        Widget imageWidget =
+            _xayDungHinhAnhCongThuc(congThuc.hinhAnh, 200, double.infinity);
 
         // Xử lý ảnh tác giả
         ImageProvider anhTacGiaWidget;
@@ -809,6 +828,7 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
                 MaterialPageRoute(
                   builder: (context) => ManHinhChiTietCongThuc(
                     congThuc: congThuc,
+                    taiLaiCongThuc: _taiCongThuc,
                   ),
                 ),
               );
@@ -918,6 +938,79 @@ class _ManHinhTrangChuState extends State<ManHinhTrangChu>
           ),
         ).animate().fadeIn(duration: 500.ms, delay: 300.ms + (index * 100).ms);
       },
+    );
+  }
+
+  Widget _xayDungHinhAnhCongThuc(
+      String duongDanAnh, double height, double width) {
+    // Kiểm tra xem hình ảnh có phải là file local không
+    if (duongDanAnh.startsWith('/')) {
+      // Đây là file local
+      final file = File(duongDanAnh);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          height: height,
+          width: width,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _xayDungHinhAnhMacDinh(height, width);
+          },
+        );
+      } else {
+        return _xayDungHinhAnhMacDinh(height, width);
+      }
+    } else if (duongDanAnh.startsWith('assets/')) {
+      // Đây là asset
+      return Image.asset(
+        duongDanAnh,
+        height: height,
+        width: width,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _xayDungHinhAnhMacDinh(height, width);
+        },
+      );
+    } else if (duongDanAnh.startsWith('http')) {
+      // Đây là URL
+      return Image.network(
+        duongDanAnh,
+        height: height,
+        width: width,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _xayDungHinhAnhMacDinh(height, width);
+        },
+      );
+    } else {
+      return _xayDungHinhAnhMacDinh(height, width);
+    }
+  }
+
+  Widget _xayDungHinhAnhMacDinh(double height, double width) {
+    return Container(
+      height: height,
+      width: width,
+      color: Colors.grey[300],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.restaurant,
+            size: 50,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Hình ảnh\nkhông có sẵn',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

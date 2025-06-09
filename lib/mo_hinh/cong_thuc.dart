@@ -14,6 +14,7 @@ class CongThuc {
   final List<String> cachLam;
   final String tacGia;
   final String anhTacGia;
+  final String uid; // ✅ thêm uid tác giả nếu cần
   bool daThich;
   final List<BinhLuan> danhSachBinhLuan;
   final List<double> danhSachDanhGia;
@@ -32,8 +33,35 @@ class CongThuc {
     required this.cachLam,
     required this.tacGia,
     required this.anhTacGia,
+    required this.uid,
     required this.daThich,
     required this.danhSachBinhLuan,
     required this.danhSachDanhGia,
   });
+
+  /// ✅ Tạo từ Firebase snapshot
+  factory CongThuc.fromMap(Map<dynamic, dynamic> data,
+      {required bool daThich}) {
+    return CongThuc(
+      ma: data['ma']?.toString() ?? '',
+      tenMon: data['tenMon'] ?? '',
+      hinhAnh: data['hinhAnh'] ?? '',
+      loai: data['loai'] ?? '',
+      thoiGianNau: data['thoiGianNau'] ?? 0,
+      khauPhan: data['khauPhan'] ?? 0,
+      diemDanhGia: (data['diemDanhGia'] ?? 0).toDouble(),
+      luotThich: data['luotThich'] ?? 0,
+      luotXem: data['luotXem'] ?? 0,
+      nguyenLieu: List<String>.from(data['nguyenLieu'] ?? []),
+      cachLam: List<String>.from(data['cachLam'] ?? []),
+      tacGia: data['tacGia'] ?? '',
+      anhTacGia: data['anhTacGia'] ?? '',
+      uid: data['uid'] ?? '',
+      daThich: daThich, // ✅ dùng giá trị tính toán từ Firebase `tym`
+      danhSachBinhLuan: [],
+      danhSachDanhGia: List<double>.from(
+        (data['danhSachDanhGia'] ?? []).map((e) => (e as num).toDouble()),
+      ),
+    );
+  }
 }

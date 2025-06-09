@@ -71,20 +71,50 @@ class _ManHinhDangNhapState extends State<ManHinhDangNhap> {
       _dangXuLy = true;
     });
 
-    final provider = Provider.of<DangKiDangNhapEmail>(context, listen: false);
-    final user = await provider.signInWithGoogle();
+    try {
+      final thanhCong =
+          await Provider.of<DangKiDangNhapEmail>(context, listen: false)
+              .signInWithGoogle();
 
-    setState(() {
-      _dangXuLy = false;
-    });
+      if (mounted) {
+        if (thanhCong != null) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const ManHinhChinh()),
+            (route) => false,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đăng nhập Google thất bại. Vui lòng thử lại sau.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        String message = e.toString();
+        if (message.contains('account-exists-with-different-credential')) {
+          message =
+              'Tài khoản này đã được đăng ký bằng phương thức khác. Hãy đăng nhập bằng email và mật khẩu.';
+        } else {
+          message = message.replaceAll('Exception: ', '');
+        }
 
-    if (user != null) {
-      // Chuyển sang màn hình chính hoặc hiển thị thông báo
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đăng nhập Google thất bại')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _dangXuLy = false;
+        });
+      }
     }
   }
 

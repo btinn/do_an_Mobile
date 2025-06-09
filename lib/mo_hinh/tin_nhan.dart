@@ -7,11 +7,15 @@ class TinNhan {
   final String tenNguoiNhan;
   final String anhNguoiNhan;
   final String noiDung;
-  final String loai; // 'text', 'image', 'recipe', 'sticker'
+  final String loai;
   final DateTime thoiGian;
   final bool daDoc;
   final String? urlHinhAnh;
   final String? maCongThuc;
+
+  // Thêm các thuộc tính cũ để tương thích
+  final String? nguoiGui;
+  final String? nguoiNhan;
 
   TinNhan({
     required this.ma,
@@ -24,30 +28,71 @@ class TinNhan {
     required this.noiDung,
     required this.loai,
     required this.thoiGian,
-    required this.daDoc,
+    this.daDoc = false,
     this.urlHinhAnh,
     this.maCongThuc,
+    this.nguoiGui,
+    this.nguoiNhan,
   });
 
-  factory TinNhan.fromMap(Map<String, dynamic> map) {
+  // Constructor cũ để tương thích
+  TinNhan.simple({
+    required this.ma,
+    required this.nguoiGui,
+    required this.nguoiNhan,
+    required this.noiDung,
+    required this.thoiGian,
+    this.daDoc = false,
+  }) : maNguoiGui = nguoiGui ?? '',
+       tenNguoiGui = '',
+       anhNguoiGui = '',
+       maNguoiNhan = nguoiNhan ?? '',
+       tenNguoiNhan = '',
+       anhNguoiNhan = '',
+       loai = 'text',
+       urlHinhAnh = null,
+       maCongThuc = null;
+
+  String get thoiGianHienThi {
+    final now = DateTime.now();
+    final difference = now.difference(thoiGian);
+
+    if (difference.inMinutes < 1) {
+      return 'Vừa xong';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}p';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d';
+    } else {
+      return '${thoiGian.day}/${thoiGian.month}';
+    }
+  }
+
+  factory TinNhan.fromJson(Map<String, dynamic> json) {
     return TinNhan(
-      ma: map['ma'] ?? '',
-      maNguoiGui: map['maNguoiGui'] ?? '',
-      tenNguoiGui: map['tenNguoiGui'] ?? '',
-      anhNguoiGui: map['anhNguoiGui'] ?? '',
-      maNguoiNhan: map['maNguoiNhan'] ?? '',
-      tenNguoiNhan: map['tenNguoiNhan'] ?? '',
-      anhNguoiNhan: map['anhNguoiNhan'] ?? '',
-      noiDung: map['noiDung'] ?? '',
-      loai: map['loai'] ?? 'text',
-      thoiGian: DateTime.fromMillisecondsSinceEpoch(map['thoiGian'] ?? 0),
-      daDoc: map['daDoc'] ?? false,
-      urlHinhAnh: map['urlHinhAnh'],
-      maCongThuc: map['maCongThuc'],
+      ma: json['ma'] ?? '',
+      maNguoiGui: json['maNguoiGui'] ?? json['nguoiGui'] ?? '',
+      tenNguoiGui: json['tenNguoiGui'] ?? '',
+      anhNguoiGui: json['anhNguoiGui'] ?? '',
+      maNguoiNhan: json['maNguoiNhan'] ?? json['nguoiNhan'] ?? '',
+      tenNguoiNhan: json['tenNguoiNhan'] ?? '',
+      anhNguoiNhan: json['anhNguoiNhan'] ?? '',
+      noiDung: json['noiDung'] ?? '',
+      loai: json['loai'] ?? 'text',
+      thoiGian: json['thoiGian'] is int 
+          ? DateTime.fromMillisecondsSinceEpoch(json['thoiGian'])
+          : DateTime.parse(json['thoiGian'] ?? DateTime.now().toIso8601String()),
+      daDoc: json['daDoc'] ?? false,
+      urlHinhAnh: json['urlHinhAnh'],
+      maCongThuc: json['maCongThuc'],
+      nguoiGui: json['nguoiGui'],
+      nguoiNhan: json['nguoiNhan'],
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'ma': ma,
       'maNguoiGui': maNguoiGui,
@@ -62,82 +107,8 @@ class TinNhan {
       'daDoc': daDoc,
       'urlHinhAnh': urlHinhAnh,
       'maCongThuc': maCongThuc,
+      'nguoiGui': nguoiGui,
+      'nguoiNhan': nguoiNhan,
     };
   }
-
-  String get thoiGianHienThi {
-    final now = DateTime.now();
-    final difference = now.difference(thoiGian);
-
-    if (difference.inMinutes < 1) {
-      return 'Vừa xong';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}p';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d';
-    } else {
-      return '${difference.inDays ~/ 7}w';
-    }
-  }
-}
-
-class CuocTroChuyenTomTat {
-  final String maNguoiKhac;
-  final String tenNguoiKhac;
-  final String anhNguoiKhac;
-  final String tinNhanCuoi;
-  final String loaiTinNhanCuoi;
-  final DateTime thoiGianCuoi;
-  final int soTinNhanChuaDoc;
-  final bool dangOnline;
-
-  CuocTroChuyenTomTat({
-    required this.maNguoiKhac,
-    required this.tenNguoiKhac,
-    required this.anhNguoiKhac,
-    required this.tinNhanCuoi,
-    required this.loaiTinNhanCuoi,
-    required this.thoiGianCuoi,
-    required this.soTinNhanChuaDoc,
-    required this.dangOnline,
-  });
-
-  String get thoiGianHienThi {
-    final now = DateTime.now();
-    final difference = now.difference(thoiGianCuoi);
-
-    if (difference.inMinutes < 1) {
-      return 'Vừa xong';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}p';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d';
-    } else {
-      return '${difference.inDays ~/ 7}w';
-    }
-  }
-}
-
-class Story {
-  final String ma;
-  final String maNguoiDung;
-  final String tenNguoiDung;
-  final String anhNguoiDung;
-  final String urlHinhAnh;
-  final DateTime thoiGian;
-  final bool daXem;
-
-  Story({
-    required this.ma,
-    required this.maNguoiDung,
-    required this.tenNguoiDung,
-    required this.anhNguoiDung,
-    required this.urlHinhAnh,
-    required this.thoiGian,
-    required this.daXem,
-  });
 }

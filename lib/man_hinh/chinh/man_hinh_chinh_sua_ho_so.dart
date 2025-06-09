@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/nguoi_dung.dart';
@@ -6,8 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:path/path.dart';
-import 'package:provider/provider.dart'; // thêm import này nếu chưa có
+import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
 
 class ManHinhChinhSuaHoSo extends StatefulWidget {
   final NguoiDung nguoiDung;
@@ -20,11 +21,11 @@ class ManHinhChinhSuaHoSo extends StatefulWidget {
 
 class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _hoTenController;
-  late TextEditingController _moTaController;
-  late TextEditingController _soDienThoaiController;
-  late TextEditingController _diaChiController;
-  late TextEditingController _ngaySinhController;
+  late TextEditingController _hoTenController = TextEditingController();
+  late TextEditingController _moTaController = TextEditingController();
+  late TextEditingController _soDienThoaiController = TextEditingController();
+  late TextEditingController _diaChiController = TextEditingController();
+  late TextEditingController _ngaySinhController = TextEditingController();
   String _gioiTinh = 'Nam';
   File? _anhDaiDien;
   bool _dangLuu = false;
@@ -32,14 +33,8 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
   @override
   void initState() {
     super.initState();
-    _hoTenController = TextEditingController(text: widget.nguoiDung.hoTen);
-    _moTaController = TextEditingController(text: widget.nguoiDung.moTa);
-    _soDienThoaiController =
-        TextEditingController(text: widget.nguoiDung.soDienThoai);
-    _diaChiController = TextEditingController(text: widget.nguoiDung.diaChi);
-    _ngaySinhController =
-        TextEditingController(text: widget.nguoiDung.ngaySinh);
-    _gioiTinh = widget.nguoiDung.gioiTinh;
+    _layThongTinTuFirebase();
+    // _taiNguoiDung();
   }
 
   @override
@@ -52,24 +47,135 @@ class _ManHinhChinhSuaHoSoState extends State<ManHinhChinhSuaHoSo> {
     super.dispose();
   }
 
+  Future<void> _taiNguoiDung() async {
+    final dichVu = Provider.of<DangKiDangNhapEmail>(context, listen: false);
+    dichVu.layNguoiDungHienTai(); // cập nhật từ Firebase
+    final nguoiDung = dichVu.nguoiDungHienTai!;
+
+    setState(() {
+      _hoTenController = TextEditingController(text: nguoiDung.hoTen);
+      _moTaController = TextEditingController(text: nguoiDung.moTa);
+      _soDienThoaiController =
+          TextEditingController(text: nguoiDung.soDienThoai);
+      _diaChiController = TextEditingController(text: nguoiDung.diaChi);
+      _ngaySinhController = TextEditingController(text: nguoiDung.ngaySinh);
+      _gioiTinh = nguoiDung.gioiTinh;
+    });
+  }
+
+  Future<void> _layThongTinTuFirebase() async {
+    try {
+      final uid = widget.nguoiDung.ma;
+      final snap =
+          await FirebaseFirestore.instance.collection('user').doc(uid).get();
+
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      setState(() {
+        _hoTenController = TextEditingController(text: data['hoTen'] ?? '');
+        _moTaController = TextEditingController(text: data['moTa'] ?? '');
+        _soDienThoaiController =
+            TextEditingController(text: data['soDienThoai'] ?? '');
+        _diaChiController = TextEditingController(text: data['diaChi'] ?? '');
+        _ngaySinhController =
+            TextEditingController(text: data['ngaySinh'] ?? '');
+        _gioiTinh = data['gioiTinh'] ?? 'Nam';
+      });
+    } catch (e) {
+      print('Lỗi khi lấy dữ liệu người dùng: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể tải thông tin người dùng')),
+      );
+    }
+  }
+
+  void _hienThiThongBao(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+      ),
+    );
+  }
+
   Future<void> _chonAnhDaiDien() async {
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _anhDaiDien = File(image.path);
-      });
+
+    // Hiển thị dialog chọn nguồn ảnh
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Chọn nguồn ảnh'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Chụp ảnh bằng Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Chọn từ Thư viện'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final pickedImage = await picker.pickImage(source: source);
+    if (pickedImage == null) return;
+
+    final file = File(pickedImage.path);
+    final exists = await file.exists();
+    if (!exists) {
+      _hienThiThongBao("Không thể sử dụng ảnh đã chọn.", Colors.red);
+      return;
+    }
+
+    setState(() {
+      _anhDaiDien = file;
+    });
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _hienThiThongBao("Chưa đăng nhập, không thể upload ảnh.", Colors.red);
+      return;
+    }
+
+    final url = await uploadAnhDaiDien(file, user.uid);
+
+    if (url != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({'avatarUrl': url});
+        _hienThiThongBao("Ảnh đại diện đã được cập nhật!", Colors.green);
+      } catch (e) {
+        print('Lỗi cập nhật Firestore: $e');
+        _hienThiThongBao(
+            "Upload ảnh xong nhưng lỗi khi cập nhật.", Colors.orange);
+      }
+    } else {
+      _hienThiThongBao("Lỗi khi upload ảnh đại diện.", Colors.red);
     }
   }
 
   Future<String?> uploadAnhDaiDien(File file, String userId) async {
     try {
-      final fileName = basename(file.path);
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${p.basename(file.path)}';
       final ref =
           FirebaseStorage.instance.ref().child('avatars/$userId/$fileName');
 
-      await ref.putFile(file);
-      return await ref.getDownloadURL();
+      final uploadTask = await ref.putFile(file);
+      return await uploadTask.ref.getDownloadURL();
     } catch (e) {
       print('Lỗi upload ảnh đại diện: $e');
       return null;

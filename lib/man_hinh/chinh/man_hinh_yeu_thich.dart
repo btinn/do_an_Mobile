@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/cong_thuc.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_cong_thuc.dart';
-import 'package:provider/provider.dart';
-import 'package:do_an/dich_vu/dich_vu_cai_dat.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class ManHinhYeuThich extends StatefulWidget {

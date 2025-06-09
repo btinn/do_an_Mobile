@@ -1,3 +1,4 @@
+import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:flutter/material.dart';
 import 'package:do_an/mo_hinh/cong_thuc.dart';
 import 'package:do_an/man_hinh/chinh/man_hinh_chi_tiet_cong_thuc.dart';
@@ -5,6 +6,7 @@ import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/tien_ich/the_cong_thuc.dart';
 import 'package:do_an/dich_vu/dich_vu_cong_thuc.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 
 class ManHinhTimKiem extends StatefulWidget {
   const ManHinhTimKiem({super.key});
@@ -57,7 +59,11 @@ class _ManHinhTimKiemState extends State<ManHinhTimKiem>
     });
 
     final dichVu = DichVuCongThuc();
-    final tatCaCongThuc = await dichVu.layDanhSachCongThuc();
+    final uid = Provider.of<DangKiDangNhapEmail>(context, listen: false)
+            .nguoiDungHienTai
+            ?.ma ??
+        '';
+    final tatCaCongThuc = await dichVu.layDanhSachCongThuc(uid);
 
     final ketQua = tatCaCongThuc.where((congThuc) {
       final lowerKhoa = tuKhoa.toLowerCase();

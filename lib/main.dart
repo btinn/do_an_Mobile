@@ -1,3 +1,4 @@
+import 'package:do_an/dich_vu/dich_vu_tym.dart';
 import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +11,7 @@ import 'package:firebase_core/firebase_core.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Khởi tạo Firebase (Android dùng google-services.json nên không cần options)
+  // Khởi tạo Firebase
   await Firebase.initializeApp();
 
   SystemChrome.setPreferredOrientations([
@@ -24,6 +25,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => DichVuCaiDat()),
         ChangeNotifierProvider(create: (_) => DangKiDangNhapEmail()),
+        ChangeNotifierProvider(create: (_) => DichVuTym()),
       ],
       child: const AmThucVietApp(),
     ),

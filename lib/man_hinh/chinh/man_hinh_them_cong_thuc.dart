@@ -1,12 +1,14 @@
 import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:do_an/giao_dien/chu_de.dart';
 import 'package:do_an/mo_hinh/cong_thuc.dart';
 import 'package:provider/provider.dart';
-import 'package:do_an/dich_vu/dich_vu_cai_dat.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:do_an/dich_vu/dich_vu_cong_thuc.dart';
+import 'package:path/path.dart' as path;
 
 class ManHinhThemCongThuc extends StatefulWidget {
   const ManHinhThemCongThuc({super.key});
@@ -43,6 +45,17 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
   bool _dangXuLy = false;
   int _buocHienTai = 0;
   final PageController _pageController = PageController();
+  final DichVuCongThuc _dichVuCongThuc = DichVuCongThuc();
+
+  // Danh sách hình ảnh mặc định cho các loại món ăn
+  final Map<String, String> _hinhAnhMacDinh = {
+    'Món Bắc': 'assets/images/mon_bac.jpg',
+    'Món Trung': 'assets/images/mon_trung.jpg',
+    'Món Nam': 'assets/images/mon_nam.jpg',
+    'Món Chay': 'assets/images/mon_chay.jpg',
+    'Món Tráng Miệng': 'assets/images/trang_mieng.jpg',
+    'Đồ Uống': 'assets/images/do_uong.jpg',
+  };
 
   @override
   void dispose() {
@@ -64,13 +77,77 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
   }
 
   Future<void> _chonHinhAnh() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    try {
+      final ImagePicker picker = ImagePicker();
 
-    if (image != null) {
-      setState(() {
-        _hinhAnh = File(image.path);
-      });
+      // Hiển thị dialog để chọn nguồn hình ảnh
+      final source = await showDialog<ImageSource>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Chọn hình ảnh'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Chụp ảnh'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Chọn từ thư viện'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (source != null) {
+        final XFile? image = await picker.pickImage(
+          source: source,
+          maxWidth: 1024,
+          maxHeight: 1024,
+          imageQuality: 80,
+        );
+
+        if (image != null) {
+          final file = File(image.path);
+          final exists = await file.exists();
+
+          if (exists) {
+            setState(() {
+              _hinhAnh = file;
+            });
+          } else {
+            _hienThiThongBao(
+              'Hình ảnh không tồn tại trên thiết bị. (Máy ảo có thể không hỗ trợ camera)',
+              Colors.red,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Lỗi khi chọn hình ảnh: $e');
+      _hienThiThongBao(
+          'Không thể chọn hình ảnh. Vui lòng thử lại!', Colors.red);
+    }
+  }
+
+  Future<String?> _uploadHinhAnhToFirebase(File hinhAnh, String uid) async {
+    try {
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${hinhAnh.path.split('/').last}';
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('cong_thuc_images/$uid/$fileName');
+
+      final uploadTask = await storageRef.putFile(hinhAnh);
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('Lỗi upload hình ảnh: $e');
+      return null;
     }
   }
 
@@ -108,35 +185,15 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
     if (_buocHienTai < 2) {
       // Kiểm tra dữ liệu trước khi chuyển bước
       if (_buocHienTai == 0) {
-        if (_tenMonController.text.isEmpty || _hinhAnh == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  const Text('Vui lòng điền đầy đủ thông tin và chọn hình ảnh'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
+        if (_tenMonController.text.isEmpty) {
+          _hienThiThongBao('Vui lòng điền tên món ăn', Colors.red);
           return;
         }
       } else if (_buocHienTai == 1) {
         if (_nguyenLieuControllers
             .any((controller) => controller.text.isEmpty)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Vui lòng điền đầy đủ thông tin nguyên liệu'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
+          _hienThiThongBao(
+              'Vui lòng điền đầy đủ thông tin nguyên liệu', Colors.red);
           return;
         }
       }
@@ -165,123 +222,271 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
     }
   }
 
-  void _luuCongThuc() async {
-    if (_formKey.currentState!.validate() && _hinhAnh != null) {
-      // Kiểm tra các bước thực hiện
-      if (_buocThucHienControllers
-          .any((controller) => controller.text.isEmpty)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Vui lòng điền đầy đủ các bước thực hiện'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-        return;
-      }
-
-      setState(() {
-        _dangXuLy = true;
-      });
-
-      // Giả lập thời gian xử lý
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        final dangNhapService = Provider.of<DangKiDangNhapEmail>(context);
-        final nguoiDung = dangNhapService.nguoiDungHienTai;
-
-        if (nguoiDung != null) {
-          final congThucMoi = CongThuc(
-            ma: DateTime.now().millisecondsSinceEpoch.toString(),
-            tenMon: _tenMonController.text,
-            hinhAnh:
-                'https://images.unsplash.com/photo-1569058242567-93de6f36f8eb',
-            loai: _loaiDuocChon,
-            thoiGianNau: int.parse(_thoiGianNauController.text),
-            khauPhan: int.parse(_khauPhanController.text),
-            diemDanhGia: 0,
-            luotThich: 0,
-            luotXem: 0,
-            nguyenLieu: _nguyenLieuControllers
-                .map((controller) => controller.text)
-                .toList(),
-            cachLam: _buocThucHienControllers
-                .map((controller) => controller.text)
-                .toList(),
-            tacGia: nguoiDung.hoTen,
-            anhTacGia: nguoiDung.anhDaiDien,
-            daThich: false,
-            danhSachBinhLuan: [],
-            danhSachDanhGia: [],
-          );
-
-          // dichVuDuLieu.themCongThuc(congThucMoi);
-
-          setState(() {
-            _dangXuLy = false;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Công thức của bạn đã được đăng thành công!'),
-              backgroundColor: ChuDe.mauXanhLa,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
-
-          // Xóa form
-          _tenMonController.clear();
-          _thoiGianNauController.clear();
-          _khauPhanController.clear();
-          _moTaController.clear();
-
-          for (var controller in _nguyenLieuControllers) {
-            controller.clear();
-          }
-
-          for (var controller in _buocThucHienControllers) {
-            controller.clear();
-          }
-
-          setState(() {
-            _hinhAnh = null;
-            _loaiDuocChon = 'Món Bắc';
-            _buocHienTai = 0;
-            _nguyenLieuControllers.clear();
-            _nguyenLieuControllers.add(TextEditingController());
-            _buocThucHienControllers.clear();
-            _buocThucHienControllers.add(TextEditingController());
-          });
-
-          _pageController.animateToPage(
-            0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-        }
-      }
-    } else if (_hinhAnh == null) {
+  void _hienThiThongBao(String message, Color color) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Vui lòng chọn hình ảnh cho công thức'),
-          backgroundColor: Colors.red,
+          content: Text(message),
+          backgroundColor: color,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
           margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
         ),
       );
     }
+  }
+
+  void _luuCongThuc() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // Kiểm tra các bước thực hiện
+    if (_buocThucHienControllers.any((controller) => controller.text.isEmpty)) {
+      _hienThiThongBao('Vui lòng điền đầy đủ các bước thực hiện', Colors.red);
+      return;
+    }
+
+    // Hiển thị dialog loading
+    _hienThiDialogLoading();
+
+    try {
+      final dangNhapService =
+          Provider.of<DangKiDangNhapEmail>(context, listen: false);
+      final nguoiDung = dangNhapService.nguoiDungHienTai;
+
+      if (nguoiDung == null) {
+        _dongDialogLoading();
+        _hienThiThongBao(
+            'Không thể xác định người dùng. Vui lòng đăng nhập lại!',
+            Colors.red);
+        return;
+      }
+
+      // Xử lý hình ảnh trong background
+      String hinhAnhPath;
+      if (_hinhAnh != null) {
+        final uploadedUrl =
+            await _uploadHinhAnhToFirebase(_hinhAnh!, nguoiDung.ma);
+        hinhAnhPath = uploadedUrl ??
+            _hinhAnhMacDinh[_loaiDuocChon] ??
+            'assets/images/default_food.jpg';
+      } else {
+        hinhAnhPath =
+            _hinhAnhMacDinh[_loaiDuocChon] ?? 'assets/images/default_food.jpg';
+      }
+
+      final congThucMoi = CongThuc(
+        ma: DateTime.now().millisecondsSinceEpoch.toString(),
+        tenMon: _tenMonController.text.trim(),
+        hinhAnh: hinhAnhPath,
+        loai: _loaiDuocChon,
+        thoiGianNau: int.tryParse(_thoiGianNauController.text) ?? 30,
+        khauPhan: int.tryParse(_khauPhanController.text) ?? 2,
+        diemDanhGia: 0,
+        luotThich: 0,
+        luotXem: 0,
+        nguyenLieu: _nguyenLieuControllers.map((c) => c.text.trim()).toList(),
+        cachLam: _buocThucHienControllers.map((c) => c.text.trim()).toList(),
+        tacGia: nguoiDung.hoTen,
+        anhTacGia: nguoiDung.anhDaiDien,
+        uid: nguoiDung.ma,
+        daThich: false,
+        danhSachBinhLuan: [],
+        danhSachDanhGia: [],
+      );
+
+      // Lưu vào Firebase
+      final thanhCong = await _dichVuCongThuc.themCongThuc(congThucMoi);
+
+      _dongDialogLoading();
+
+      if (thanhCong) {
+        _hienThiDialogThanhCong();
+      } else {
+        _hienThiThongBao(
+            'Có lỗi xảy ra khi đăng công thức. Vui lòng thử lại!', Colors.red);
+      }
+    } catch (e) {
+      _dongDialogLoading();
+      debugPrint('Lỗi khi lưu công thức: $e');
+      _hienThiThongBao('Lỗi: ${e.toString()}', Colors.red);
+    }
+  }
+
+  void _hienThiDialogLoading() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(ChuDe.mauChinh),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Đang lưu công thức...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Vui lòng đợi trong giây lát',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _dongDialogLoading() {
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _hienThiDialogThanhCong() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: const BoxDecoration(
+                  color: ChuDe.mauXanhLa,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Thành công!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Công thức của bạn đã được đăng thành công!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: ChuDe.mauChuPhu,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Đóng dialog
+                        _resetForm(); // Reset form để tạo công thức mới
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ChuDe.mauChinh,
+                        side: const BorderSide(color: ChuDe.mauChinh),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Tạo thêm'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Đóng dialog
+                        Navigator.of(context)
+                            .pop(true); // Quay về màn hình trước
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ChuDe.mauChinh,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Xem công thức'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _resetForm() {
+    _tenMonController.clear();
+    _thoiGianNauController.clear();
+    _khauPhanController.clear();
+    _moTaController.clear();
+
+    for (var controller in _nguyenLieuControllers) {
+      controller.clear();
+    }
+
+    for (var controller in _buocThucHienControllers) {
+      controller.clear();
+    }
+
+    setState(() {
+      _hinhAnh = null;
+      _loaiDuocChon = 'Món Bắc';
+      _buocHienTai = 0;
+      _nguyenLieuControllers.clear();
+      _nguyenLieuControllers.add(TextEditingController());
+      _buocThucHienControllers.clear();
+      _buocThucHienControllers.add(TextEditingController());
+    });
+
+    _pageController.animateToPage(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
@@ -289,6 +494,8 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Thêm Công Thức Mới'),
+        backgroundColor: ChuDe.mauChinh,
+        foregroundColor: Colors.white,
         actions: [
           TextButton.icon(
             onPressed: _dangXuLy ? null : _luuCongThuc,
@@ -297,15 +504,12 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                      color: ChuDe.mauChinh,
+                      color: Colors.white,
                       strokeWidth: 2,
                     ),
                   )
-                : const Icon(Icons.check),
-            label: const Text('Lưu'),
-            style: TextButton.styleFrom(
-              foregroundColor: ChuDe.mauChinh,
-            ),
+                : const Icon(Icons.check, color: Colors.white),
+            label: const Text('Lưu', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -316,31 +520,27 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
             // Thanh tiến trình
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      _xayDungBuocTienTrinh(0, 'Thông tin'),
-                      Expanded(
-                        child: Container(
-                          height: 2,
-                          color: _buocHienTai >= 1
-                              ? ChuDe.mauChinh
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      _xayDungBuocTienTrinh(1, 'Nguyên liệu'),
-                      Expanded(
-                        child: Container(
-                          height: 2,
-                          color: _buocHienTai >= 2
-                              ? ChuDe.mauChinh
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      _xayDungBuocTienTrinh(2, 'Cách làm'),
-                    ],
+                  _xayDungBuocTienTrinh(0, 'Thông tin'),
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      color: _buocHienTai >= 1
+                          ? ChuDe.mauChinh
+                          : Colors.grey.shade300,
+                    ),
                   ),
+                  _xayDungBuocTienTrinh(1, 'Nguyên liệu'),
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      color: _buocHienTai >= 2
+                          ? ChuDe.mauChinh
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  _xayDungBuocTienTrinh(2, 'Cách làm'),
                 ],
               ),
             ),
@@ -351,13 +551,8 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  // Bước 1: Thông tin cơ bản
                   _xayDungBuocThongTin(),
-
-                  // Bước 2: Nguyên liệu
                   _xayDungBuocNguyenLieu(),
-
-                  // Bước 3: Cách làm
                   _xayDungBuocCachLam(),
                 ],
               ),
@@ -414,7 +609,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                     )
                   else
                     ElevatedButton.icon(
-                      onPressed: _dangXuLy ? null : _luuCongThuc,
+                      onPressed: _luuCongThuc,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ChuDe.mauChinh,
                         foregroundColor: Colors.white,
@@ -424,16 +619,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      icon: _dangXuLy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.check),
+                      icon: const Icon(Icons.check),
                       label: const Text('Hoàn thành'),
                     ),
                 ],
@@ -512,47 +698,59 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
               decoration: BoxDecoration(
                 color: Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(16),
-                image: _hinhAnh != null
-                    ? DecorationImage(
-                        image: FileImage(_hinhAnh!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
+                border: Border.all(color: Colors.grey.shade300),
               ),
-              child: _hinhAnh == null
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(
-                          Icons.add_photo_alternate,
-                          size: 64,
-                          color: ChuDe.mauChuPhu,
+              child: _hinhAnh != null
+                  ? Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.file(
+                            _hinhAnh!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
                         ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Thêm hình ảnh món ăn',
-                          style: TextStyle(
-                            color: ChuDe.mauChuPhu,
-                            fontSize: 16,
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: CircleAvatar(
+                            backgroundColor: Colors.black54,
+                            radius: 16,
+                            child: IconButton(
+                              icon: const Icon(Icons.edit,
+                                  size: 16, color: Colors.white),
+                              onPressed: _chonHinhAnh,
+                            ),
                           ),
                         ),
                       ],
                     )
-                  : Stack(
-                      alignment: Alignment.topRight,
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: CircleAvatar(
-                            backgroundColor: Colors.white,
-                            radius: 16,
-                            child: IconButton(
-                              icon: const Icon(Icons.edit, size: 16),
-                              color: ChuDe.mauChinh,
-                              onPressed: _chonHinhAnh,
-                            ),
+                        Icon(
+                          Icons.add_photo_alternate,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Thêm hình ảnh món ăn',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '(Tùy chọn - sẽ dùng ảnh mặc định nếu không chọn)',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
@@ -563,7 +761,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
 
           // Tên món
           const Text(
-            'Tên Món Ăn',
+            'Tên Món Ăn *',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -575,9 +773,10 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
             decoration: const InputDecoration(
               hintText: 'Nhập tên món ăn',
               prefixIcon: Icon(Icons.restaurant_menu),
+              border: OutlineInputBorder(),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) {
+              if (value == null || value.trim().isEmpty) {
                 return 'Vui lòng nhập tên món ăn';
               }
               return null;
@@ -600,6 +799,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
             decoration: const InputDecoration(
               hintText: 'Mô tả ngắn về món ăn',
               prefixIcon: Icon(Icons.description),
+              border: OutlineInputBorder(),
             ),
             maxLines: 3,
           ).animate().fadeIn(duration: 500.ms, delay: 300.ms),
@@ -608,7 +808,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
 
           // Loại món ăn
           const Text(
-            'Loại Món Ăn',
+            'Loại Món Ăn *',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -619,6 +819,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
             value: _loaiDuocChon,
             decoration: const InputDecoration(
               prefixIcon: Icon(Icons.category),
+              border: OutlineInputBorder(),
             ),
             items: _danhSachLoai.map((loai) {
               return DropdownMenuItem<String>(
@@ -645,7 +846,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Thời Gian Nấu (phút)',
+                      'Thời Gian Nấu (phút) *',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -656,12 +857,16 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                       controller: _thoiGianNauController,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        hintText: 'Thời gian',
+                        hintText: 'VD: 30',
                         prefixIcon: Icon(Icons.access_time),
+                        border: OutlineInputBorder(),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
+                        if (value == null || value.trim().isEmpty) {
                           return 'Vui lòng nhập thời gian';
+                        }
+                        if (int.tryParse(value.trim()) == null) {
+                          return 'Vui lòng nhập số';
                         }
                         return null;
                       },
@@ -675,7 +880,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Khẩu Phần',
+                      'Khẩu Phần *',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -686,12 +891,16 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                       controller: _khauPhanController,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        hintText: 'Số người',
+                        hintText: 'VD: 4',
                         prefixIcon: Icon(Icons.people),
+                        border: OutlineInputBorder(),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
+                        if (value == null || value.trim().isEmpty) {
                           return 'Vui lòng nhập khẩu phần';
+                        }
+                        if (int.tryParse(value.trim()) == null) {
+                          return 'Vui lòng nhập số';
                         }
                         return null;
                       },
@@ -712,7 +921,6 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Nguyên liệu
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -733,10 +941,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
               ),
             ],
           ).animate().fadeIn(duration: 500.ms),
-
           const SizedBox(height: 16),
-
-          // Mẹo
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -763,7 +968,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Hãy liệt kê đầy đủ nguyên liệu cùng với số lượng cụ thể để người nấu dễ dàng chuẩn bị.',
+                        'Hãy liệt kê đầy đủ nguyên liệu cùng với số lượng cụ thể (VD: 200g thịt bò, 2 quả trứng)',
                         style: TextStyle(
                           fontSize: 14,
                         ),
@@ -774,9 +979,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
               ],
             ),
           ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
-
           const SizedBox(height: 16),
-
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -789,7 +992,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                     Container(
                       width: 24,
                       height: 24,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: ChuDe.mauChinh,
                         shape: BoxShape.circle,
                       ),
@@ -809,8 +1012,8 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                       child: TextFormField(
                         controller: _nguyenLieuControllers[index],
                         decoration: InputDecoration(
-                          hintText:
-                              'Nguyên liệu ${index + 1} (VD: 200g thịt bò)',
+                          hintText: 'VD: 200g thịt bò',
+                          border: const OutlineInputBorder(),
                           suffixIcon: _nguyenLieuControllers.length > 1
                               ? IconButton(
                                   icon: const Icon(Icons.delete,
@@ -820,7 +1023,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                               : null,
                         ),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
+                          if (value == null || value.trim().isEmpty) {
                             return 'Vui lòng nhập nguyên liệu';
                           }
                           return null;
@@ -834,9 +1037,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                   .fadeIn(duration: 500.ms, delay: 300.ms + (index * 100).ms);
             },
           ),
-
           const SizedBox(height: 16),
-
           Center(
             child: ElevatedButton.icon(
               onPressed: _themNguyenLieu,
@@ -865,7 +1066,6 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Các bước thực hiện
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -886,10 +1086,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
               ),
             ],
           ).animate().fadeIn(duration: 500.ms),
-
           const SizedBox(height: 16),
-
-          // Mẹo
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -916,7 +1113,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Mô tả chi tiết từng bước thực hiện để người nấu dễ dàng làm theo. Bạn có thể thêm mẹo nấu ăn vào mỗi bước.',
+                        'Mô tả chi tiết từng bước thực hiện để người nấu dễ dàng làm theo.',
                         style: TextStyle(
                           fontSize: 14,
                         ),
@@ -927,9 +1124,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
               ],
             ),
           ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
-
           const SizedBox(height: 16),
-
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -941,13 +1136,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(5),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+                  border: Border.all(color: Colors.grey.shade300),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -957,7 +1146,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                         Container(
                           width: 32,
                           height: 32,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: ChuDe.mauChinh,
                             shape: BoxShape.circle,
                           ),
@@ -991,12 +1180,12 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                     TextFormField(
                       controller: _buocThucHienControllers[index],
                       decoration: const InputDecoration(
-                        hintText: 'Mô tả bước thực hiện',
+                        hintText: 'Mô tả chi tiết bước thực hiện...',
                         border: OutlineInputBorder(),
                       ),
                       maxLines: 3,
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
+                        if (value == null || value.trim().isEmpty) {
                           return 'Vui lòng nhập bước thực hiện';
                         }
                         return null;
@@ -1009,9 +1198,7 @@ class _ManHinhThemCongThucState extends State<ManHinhThemCongThuc> {
                   .fadeIn(duration: 500.ms, delay: 300.ms + (index * 100).ms);
             },
           ),
-
           const SizedBox(height: 16),
-
           Center(
             child: ElevatedButton.icon(
               onPressed: _themBuocThucHien,

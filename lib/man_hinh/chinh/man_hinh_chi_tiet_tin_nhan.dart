@@ -347,7 +347,7 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: ChuDe.mauOnline.withOpacity(0.1),
+              color: ChuDe.mauOnline.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
             ),
             child: Row(
@@ -451,7 +451,7 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
                               tinNhan.thoiGianHienThi,
                               style: TextStyle(
                                 color: laTinNhanCuaToi
-                                    ? Colors.white.withOpacity(0.8)
+                                    ? Colors.white.withValues(alpha: 0.8)
                                     : ChuDe.mauChuPhu,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -466,7 +466,7 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
                                 size: 14,
                                 color: tinNhan.daDoc
                                     ? Colors.blue.shade300
-                                    : Colors.white.withOpacity(0.8),
+                                    : Colors.white.withValues(alpha: 0.8),
                               ),
                             ],
                           ],
@@ -917,7 +917,7 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: color.withOpacity(0.3),
+                  color: color.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),

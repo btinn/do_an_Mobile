@@ -1,3 +1,4 @@
+import 'package:do_an/dich_vu/dich_vu_thong_bao.dart';
 import 'package:do_an/dich_vu/dich_vu_xac_thuc/dang_ki_dang_nhap.dart';
 import 'package:flutter/material.dart';
 import 'package:do_an/mo_hinh/cong_thuc.dart';
@@ -8,13 +9,21 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:do_an/man_hinh/chinh/man_hinh_ho_so_nguoi_dung.dart';
+import 'package:do_an/dich_vu/dich_vu_danh_gia.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:do_an/dich_vu/dich_vu_cong_thuc.dart';
+import 'package:do_an/dich_vu/dich_vu_binh_luan.dart';
+import 'dart:io';
 
 class ManHinhChiTietCongThuc extends StatefulWidget {
   final CongThuc congThuc;
+  final Future<void> Function()? taiLaiCongThuc;
 
   const ManHinhChiTietCongThuc({
     super.key,
     required this.congThuc,
+    this.taiLaiCongThuc,
   });
 
   @override
@@ -25,16 +34,23 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _binhLuanController = TextEditingController();
+  final DichVuBinhLuan _dichVuBinhLuan = DichVuBinhLuan();
   double _danhGia = 5.0;
   bool _dangHienThiDanhGia = false;
   bool _daLuuCongThuc = false;
+  bool _daThich = false;
+  bool _dangGuiBinhLuan = false;
   final ScrollController _scrollController = ScrollController();
   bool _hienThiAppBarMau = false;
+  double _diemTrungBinh = 0.0;
+  int _soLuongDanhGia = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _daThich = widget.congThuc.daThich;
+    _danhGia = widget.congThuc.diemDanhGia;
 
     _scrollController.addListener(() {
       if (_scrollController.position.pixels > 200 && !_hienThiAppBarMau) {
@@ -58,25 +74,125 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
     super.dispose();
   }
 
-  void _guiBinhLuan() {
-    if (_binhLuanController.text.isNotEmpty) {
-      final dangNhapService = Provider.of<DangKiDangNhapEmail>(context);
-      final nguoiDung = dangNhapService.nguoiDungHienTai;
+  void _guiBinhLuan() async {
+    if (_binhLuanController.text.trim().isEmpty || _dangGuiBinhLuan) return;
 
-      final binhLuanMoi = BinhLuan(
-        ma: DateTime.now().millisecondsSinceEpoch.toString(),
-        noiDung: _binhLuanController.text,
-        thoiGian: DateTime.now(),
-        tacGia: nguoiDung?.hoTen ?? 'Người dùng ẩn danh',
-        anhTacGia: nguoiDung?.anhDaiDien ?? 'assets/images/avatar.jpg',
+    final dangNhapService =
+        Provider.of<DangKiDangNhapEmail>(context, listen: false);
+    final nguoiDung = dangNhapService.nguoiDungHienTai;
+
+    if (nguoiDung == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng đăng nhập để bình luận'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _dangGuiBinhLuan = true;
+    });
+
+    try {
+      final thanhCong = await _dichVuBinhLuan.themBinhLuan(
+        maCongThuc: widget.congThuc.ma,
+        noiDung: _binhLuanController.text.trim(),
+        uid: nguoiDung.ma,
+        hoTen: nguoiDung.hoTen,
+        anhDaiDien: nguoiDung.anhDaiDien,
       );
 
-      // dichVuDuLieu.themBinhLuan(widget.congThuc.ma, binhLuanMoi);
-      _binhLuanController.clear();
+      if (mounted) {
+        if (thanhCong) {
+          _binhLuanController.clear();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Bình luận của bạn đã được gửi!'),
+              backgroundColor: ChuDe.mauXanhLa,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Có lỗi xảy ra khi gửi bình luận'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Có lỗi xảy ra khi gửi bình luận'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _dangGuiBinhLuan = false;
+        });
+      }
+    }
+  }
+
+  void _guiDanhGia() async {
+    final uid = Provider.of<DangKiDangNhapEmail>(context, listen: false)
+            .nguoiDungHienTai
+            ?.ma ??
+        '';
+    if (uid.isEmpty) return;
+
+    final dichVu = DichVuDanhGia();
+
+    // Gửi đánh giá lên Firebase
+    await dichVu.danhGiaCongThuc(widget.congThuc.ma, uid, _danhGia);
+
+    // Tính điểm trung bình mới
+    final diemTrungBinh = await dichVu.layDiemTrungBinh(widget.congThuc.ma);
+    final soLuongMoi = await dichVu.demSoLuongDanhGia(widget.congThuc.ma);
+
+    // Cập nhật lại Firebase
+    await FirebaseDatabase.instance
+        .ref('cong_thuc/${widget.congThuc.ma}/diemDanhGia')
+        .set(diemTrungBinh);
+
+    if (uid != widget.congThuc.uid) {
+      final thongBaoService = DichVuThongBao();
+      final tenNguoiGui =
+          Provider.of<DangKiDangNhapEmail>(context, listen: false)
+                  .nguoiDungHienTai
+                  ?.hoTen ??
+              'Người dùng';
+
+      await thongBaoService.taoThongBaoDanhGia(
+        maNguoiNhan: widget.congThuc.uid,
+        maNguoiGui: uid,
+        tenNguoiGui: tenNguoiGui,
+        maCongThuc: widget.congThuc.ma,
+        tenCongThuc: widget.congThuc.tenMon,
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _dangHienThiDanhGia = false;
+        _diemTrungBinh = diemTrungBinh;
+        _soLuongDanhGia = soLuongMoi;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Bình luận của bạn đã được gửi!'),
+          content: const Text('Cảm ơn bạn đã đánh giá công thức!'),
           backgroundColor: ChuDe.mauXanhLa,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -86,27 +202,6 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
         ),
       );
     }
-  }
-
-  void _guiDanhGia() {
-    // final dichVuDuLieu = Provider.of<DichVuDuLieu>(context, listen: false);
-    // dichVuDuLieu.danhGiaCongThuc(widget.congThuc.ma, _danhGia);
-
-    setState(() {
-      _dangHienThiDanhGia = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Cảm ơn bạn đã đánh giá công thức!'),
-        backgroundColor: ChuDe.mauXanhLa,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   void _luuCongThuc() {
@@ -135,934 +230,829 @@ class _ManHinhChiTietCongThucState extends State<ManHinhChiTietCongThuc>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: NestedScrollView(
-        controller: _scrollController,
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverAppBar(
-              expandedHeight: 300,
-              pinned: true,
-              backgroundColor:
-                  _hienThiAppBarMau ? ChuDe.mauChinh : Colors.transparent,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Hero(
-                  tag: 'recipe_image_${widget.congThuc.ma}',
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.asset(
-                        widget.congThuc.hinhAnh,
-                        fit: BoxFit.cover,
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withAlpha(180),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 16,
-                        left: 16,
-                        right: 16,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: ChuDe.mauChinh,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                widget.congThuc.loai,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              widget.congThuc.tenMon,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 16,
-                                  backgroundImage:
-                                      AssetImage(widget.congThuc.anhTacGia),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  widget.congThuc.tacGia,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.star,
-                                      color: Colors.amber,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      widget.congThuc.diemDanhGia
-                                          .toStringAsFixed(1),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '(${widget.congThuc.danhSachDanhGia.length})',
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                title: _hienThiAppBarMau
-                    ? Text(
-                        widget.congThuc.tenMon,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
-              ),
-              leading: IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _hienThiAppBarMau ? Colors.white24 : Colors.black26,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_back,
-                    color: _hienThiAppBarMau ? Colors.white : Colors.white,
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              ),
-              actions: [
-                IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color:
-                          _hienThiAppBarMau ? Colors.white24 : Colors.black26,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      _daLuuCongThuc ? Icons.bookmark : Icons.bookmark_border,
-                      color: _hienThiAppBarMau ? Colors.white : Colors.white,
-                    ),
-                  ),
-                  onPressed: _luuCongThuc,
-                ),
-                IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color:
-                          _hienThiAppBarMau ? Colors.white24 : Colors.black26,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.share,
-                      color: _hienThiAppBarMau ? Colors.white : Colors.white,
-                    ),
-                  ),
-                  onPressed: _chiaSeCongThuc,
-                ),
-              ],
-            ),
-            SliverPersistentHeader(
-              delegate: _SliverAppBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  labelColor: ChuDe.mauChinh,
-                  unselectedLabelColor: ChuDe.mauChuPhu,
-                  indicatorColor: ChuDe.mauChinh,
-                  indicatorWeight: 3,
-                  tabs: const [
-                    Tab(text: 'Công Thức'),
-                    Tab(text: 'Nguyên Liệu'),
-                    Tab(text: 'Bình Luận'),
-                  ],
-                ),
-              ),
-              pinned: true,
-            ),
-          ];
-        },
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            // Tab Công Thức
-            _xayDungTabCongThuc(),
-
-            // Tab Nguyên Liệu
-            _xayDungTabNguyenLieu(),
-
-            // Tab Bình Luận
-            _xayDungTabBinhLuan(),
-          ],
+  void _chuyenDenTrangCaNhan() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManHinhHoSoNguoiDung(
+          maNguoiDung: widget.congThuc.uid,
+          tenNguoiDung: widget.congThuc.tacGia,
+          anhDaiDien: widget.congThuc.anhTacGia,
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            _dangHienThiDanhGia = true;
-          });
-        },
-        backgroundColor: ChuDe.mauChinh,
-        child: const Icon(Icons.star),
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 4,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: ElevatedButton.icon(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: ChuDe.mauChinh,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          icon: const Icon(Icons.restaurant_menu),
-          label: const Text(
-            'Bắt Đầu Nấu Ăn',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-      // Hiển thị đánh giá
-      bottomSheet: _dangHienThiDanhGia
-          ? Container(
-              color: Colors.black.withAlpha(150),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const Text(
-                      'Đánh Giá Công Thức',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.congThuc.tenMon,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: ChuDe.mauChuPhu,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    RatingBar.builder(
-                      initialRating: _danhGia,
-                      minRating: 1,
-                      direction: Axis.horizontal,
-                      allowHalfRating: true,
-                      itemCount: 5,
-                      itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
-                      itemBuilder: (context, _) => const Icon(
-                        Icons.star,
-                        color: Colors.amber,
-                      ),
-                      onRatingUpdate: (rating) {
-                        setState(() {
-                          _danhGia = rating;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _dangHienThiDanhGia = false;
-                            });
-                          },
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                          ),
-                          child: const Text('Hủy'),
-                        ),
-                        ElevatedButton(
-                          onPressed: _guiDanhGia,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: ChuDe.mauChinh,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text('Gửi Đánh Giá'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : null,
     );
   }
 
-  Widget _xayDungTabCongThuc() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Thông tin công thức
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _xayDungThongTinCongThuc(
-                  icon: Icons.access_time,
-                  label: 'Thời gian',
-                  value: '${widget.congThuc.thoiGianNau} phút',
-                ),
-                _xayDungThongTinCongThuc(
-                  icon: Icons.restaurant,
-                  label: 'Khẩu phần',
-                  value: '${widget.congThuc.khauPhan} người',
-                ),
-                _xayDungThongTinCongThuc(
-                  icon: Icons.local_fire_department,
-                  label: 'Độ khó',
-                  value: 'Trung bình',
-                ),
-              ],
-            ),
-          ).animate().fadeIn(duration: 500.ms),
+  void _xoaCongThuc() {
+    final scaffoldContext = context;
 
-          const SizedBox(height: 24),
+    showDialog(
+      context: scaffoldContext,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xác nhận xóa'),
+        content: const Text('Bạn có chắc chắn muốn xóa công thức này không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final uid = Provider.of<DangKiDangNhapEmail>(
+                    scaffoldContext,
+                    listen: false,
+                  ).nguoiDungHienTai?.ma ??
+                  '';
 
-          // Hướng dẫn
-          const Text(
-            'Hướng Dẫn',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
+              Navigator.pop(dialogContext);
 
-          const SizedBox(height: 16),
+              final dichVuCongThuc = DichVuCongThuc();
+              final thanhCong =
+                  await dichVuCongThuc.xoaCongThuc(widget.congThuc.ma, uid);
 
-          ...widget.congThuc.cachLam.asMap().entries.map((entry) {
-            final index = entry.key;
-            final buoc = entry.value;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(5),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+              if (!mounted) return;
+
+              if (thanhCong) {
+                ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã xóa công thức thành công'),
+                    backgroundColor: Colors.green,
                   ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: ChuDe.mauChinh,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                );
+                Navigator.pop(scaffoldContext, true);
+              } else {
+                ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Có lỗi xảy ra khi xóa công thức'),
+                    backgroundColor: Colors.red,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      buoc,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ],
-              ),
-            )
-                .animate()
-                .fadeIn(duration: 500.ms, delay: 400.ms + (index * 100).ms);
-          }),
-
-          const SizedBox(height: 24),
-
-          // Mẹo nấu ăn
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ChuDe.mauPhu,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.lightbulb,
-                      color: ChuDe.mauChinh,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Mẹo Nấu Ăn',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: ChuDe.mauChinh,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                Text(
-                  '• Nên ninh xương trong nước lạnh để nước dùng trong hơn.',
-                  style: TextStyle(fontSize: 14),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Nướng hành và gừng trước khi cho vào nồi sẽ giúp nước dùng thơm hơn.',
-                  style: TextStyle(fontSize: 14),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Thịt bò nên thái mỏng và để đông lạnh trước khi thái để dễ thái hơn.',
-                  style: TextStyle(fontSize: 14),
-                ),
-              ],
-            ),
-          ).animate().fadeIn(duration: 500.ms, delay: 600.ms),
-
-          const SizedBox(height: 80), // Để tránh bị che bởi nút bắt đầu nấu ăn
+                );
+              }
+            },
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _xayDungThongTinCongThuc({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          color: ChuDe.mauChinh,
-          size: 28,
+  Widget _xayDungHinhAnh() {
+    return Container(
+      height: 300,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
         ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: ChuDe.mauChuPhu,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(30),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
+        child: _xayDungHinhAnhCongThuc(),
+      ),
     );
   }
 
-  Widget _xayDungTabNguyenLieu() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Số lượng khẩu phần
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
+  Widget _xayDungHinhAnhCongThuc() {
+    if (widget.congThuc.hinhAnh.startsWith('/')) {
+      final file = File(widget.congThuc.hinhAnh);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+        );
+      } else {
+        return Image.asset(
+          'assets/images/default_food.jpg',
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey[300],
+              child: const Icon(
+                Icons.image_not_supported,
+                size: 50,
+                color: Colors.grey,
+              ),
+            );
+          },
+        );
+      }
+    } else if (widget.congThuc.hinhAnh.startsWith('assets/')) {
+      return Image.asset(
+        widget.congThuc.hinhAnh,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey[300],
+            child: const Icon(
+              Icons.image_not_supported,
+              size: 50,
+              color: Colors.grey,
             ),
-            child: Row(
-              children: [
-                const Text(
-                  'Khẩu Phần:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+          );
+        },
+      );
+    } else {
+      return Image.network(
+        widget.congThuc.hinhAnh,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey[300],
+            child: const Icon(
+              Icons.image_not_supported,
+              size: 50,
+              color: Colors.grey,
+            ),
+          );
+        },
+      );
+    }
+  }
+
+  Widget _xayDungAvatarTacGia() {
+    if (widget.congThuc.anhTacGia.isEmpty) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundColor: ChuDe.mauChinh,
+        child: Text(
+          widget.congThuc.tacGia.isNotEmpty
+              ? widget.congThuc.tacGia[0].toUpperCase()
+              : 'U',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+
+    if (widget.congThuc.anhTacGia.startsWith('/')) {
+      final file = File(widget.congThuc.anhTacGia);
+      if (file.existsSync()) {
+        return CircleAvatar(
+          radius: 20,
+          backgroundImage: FileImage(file),
+        );
+      }
+    } else if (widget.congThuc.anhTacGia.startsWith('assets/')) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundImage: AssetImage(widget.congThuc.anhTacGia),
+      );
+    } else if (widget.congThuc.anhTacGia.startsWith('http')) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundImage: NetworkImage(widget.congThuc.anhTacGia),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: ChuDe.mauChinh,
+      child: Text(
+        widget.congThuc.tacGia.isNotEmpty
+            ? widget.congThuc.tacGia[0].toUpperCase()
+            : 'U',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dangNhapService = Provider.of<DangKiDangNhapEmail>(context);
+    final nguoiDungHienTai = dangNhapService.nguoiDungHienTai;
+    final laChuSoHuu = nguoiDungHienTai?.ma == widget.congThuc.uid;
+
+    return Scaffold(
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 300,
+            pinned: true,
+            backgroundColor:
+                _hienThiAppBarMau ? ChuDe.mauChinh : Colors.transparent,
+            elevation: _hienThiAppBarMau ? 4 : 0,
+            leading: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(100),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            actions: [
+              if (laChuSoHuu)
+                Container(
+                  margin: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(100),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: _xoaCongThuc,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: ChuDe.mauChuPhu),
-                    borderRadius: BorderRadius.circular(8),
+              Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(100),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    _daLuuCongThuc ? Icons.bookmark : Icons.bookmark_border,
+                    color: _daLuuCongThuc ? ChuDe.mauVang : Colors.white,
                   ),
-                  child: Row(
+                  onPressed: _luuCongThuc,
+                ),
+              ),
+              Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(100),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.share, color: Colors.white),
+                  onPressed: _chiaSeCongThuc,
+                ),
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: _xayDungHinhAnh(),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.congThuc.tenMon,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: ChuDe.mauChinh,
+                    ),
+                  ).animate().fadeIn(duration: 500.ms),
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: _chuyenDenTrangCaNhan,
+                    child: Row(
+                      children: [
+                        _xayDungAvatarTacGia(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.congThuc.tacGia,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Tác giả công thức',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                      ],
+                    ),
+                  ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove),
-                        onPressed: () {},
-                        iconSize: 16,
-                      ),
-                      Text(
-                        '${widget.congThuc.khauPhan}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: _xayDungThongTinNhanh(
+                          Icons.access_time,
+                          '${widget.congThuc.thoiGianNau} phút',
+                          'Thời gian',
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: () {},
-                        iconSize: 16,
+                      Expanded(
+                        child: _xayDungThongTinNhanh(
+                          Icons.people,
+                          '${widget.congThuc.khauPhan} người',
+                          'Khẩu phần',
+                        ),
+                      ),
+                      Expanded(
+                        child: _xayDungThongTinNhanh(
+                          Icons.star,
+                          widget.congThuc.diemDanhGia.toStringAsFixed(1),
+                          'Đánh giá',
+                        ),
+                      ),
+                      Expanded(
+                        child: _xayDungThongTinNhanh(
+                          Icons.category,
+                          widget.congThuc.loai,
+                          'Loại',
+                        ),
                       ),
                     ],
+                  ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
+                  const SizedBox(height: 24),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
+                        color: ChuDe.mauChinh,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.grey.shade600,
+                      tabs: const [
+                        Tab(text: 'Nguyên liệu'),
+                        Tab(text: 'Cách làm'),
+                        Tab(text: 'Bình luận'),
+                      ],
+                    ),
+                  ).animate().fadeIn(duration: 500.ms, delay: 600.ms),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 400,
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _xayDungDanhSachNguyenLieu(),
+                        _xayDungCachLam(),
+                        _xayDungBinhLuan(),
+                      ],
+                    ),
                   ),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Đặt lại'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: ChuDe.mauChinh,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ).animate().fadeIn(duration: 500.ms),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          setState(() {
+            _dangHienThiDanhGia = true;
+          });
+          _hienThiDialogDanhGia();
+          if (widget.taiLaiCongThuc != null) {
+            await widget.taiLaiCongThuc!();
+          }
+        },
+        backgroundColor: ChuDe.mauChinh,
+        icon: const Icon(Icons.star, color: Colors.white),
+        label: const Text(
+          'Đánh giá',
+          style: TextStyle(color: Colors.white),
+        ),
+      ).animate().scale(duration: 500.ms, delay: 800.ms),
+    );
+  }
 
-          const SizedBox(height: 24),
-
-          // Danh sách nguyên liệu
-          const Text(
-            'Nguyên Liệu',
-            style: TextStyle(
-              fontSize: 20,
+  Widget _xayDungThongTinNhanh(IconData icon, String giaTri, String nhan) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: ChuDe.mauPhu,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: ChuDe.mauChinh, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            giaTri,
+            style: const TextStyle(
               fontWeight: FontWeight.bold,
+              fontSize: 14,
             ),
-          ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
+            textAlign: TextAlign.center,
+          ),
+          Text(
+            nhan,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(height: 16),
-
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
+  Widget _xayDungDanhSachNguyenLieu() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: widget.congThuc.nguyenLieu.length,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: ChuDe.mauChinh,
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-            child: Column(
-              children: widget.congThuc.nguyenLieu.asMap().entries.map((entry) {
-                final nguyenLieu = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.congThuc.nguyenLieu[index],
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ).animate().fadeIn(duration: 300.ms, delay: (index * 100).ms);
+      },
+    );
+  }
+
+  Widget _xayDungCachLam() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: widget.congThuc.cachLam.length,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: ChuDe.mauChinh,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${index + 1}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.congThuc.cachLam[index],
+                  style: const TextStyle(fontSize: 16, height: 1.5),
+                ),
+              ),
+            ],
+          ),
+        ).animate().fadeIn(duration: 300.ms, delay: (index * 100).ms);
+      },
+    );
+  }
+
+  Widget _xayDungBinhLuan() {
+    return Column(
+      children: [
+        // Form nhập bình luận
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: [
+              TextField(
+                controller: _binhLuanController,
+                decoration: const InputDecoration(
+                  hintText: 'Chia sẻ cảm nhận của bạn về công thức này...',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.all(12),
+                ),
+                maxLines: 3,
+                enabled: !_dangGuiBinhLuan,
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _dangGuiBinhLuan ? null : _guiBinhLuan,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ChuDe.mauChinh,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: _dangGuiBinhLuan
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.send),
+                  label:
+                      Text(_dangGuiBinhLuan ? 'Đang gửi...' : 'Gửi bình luận'),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Danh sách bình luận
+        Expanded(
+          child: StreamBuilder<List<BinhLuan>>(
+            stream: _dichVuBinhLuan.layDanhSachBinhLuan(widget.congThuc.ma),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: ChuDe.mauChinh,
-                          shape: BoxShape.circle,
-                        ),
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.grey.shade400,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          nguyenLieu,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      Checkbox(
-                        value: false,
-                        onChanged: (value) {},
-                        activeColor: ChuDe.mauChinh,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Có lỗi xảy ra khi tải bình luận',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 16,
                         ),
                       ),
                     ],
                   ),
                 );
-              }).toList(),
-            ),
-          ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
+              }
 
-          const SizedBox(height: 24),
+              final danhSachBinhLuan = snapshot.data ?? [];
 
-          // Nút thêm vào danh sách mua sắm
-          ElevatedButton.icon(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ChuDe.mauXanhLa,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            icon: const Icon(Icons.shopping_cart),
-            label: const Text(
-              'Thêm Vào Danh Sách Mua Sắm',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ).animate().fadeIn(duration: 500.ms, delay: 600.ms),
-
-          const SizedBox(height: 80), // Để tránh bị che bởi nút bắt đầu nấu ăn
-        ],
-      ),
-    );
-  }
-
-  Widget _xayDungTabBinhLuan() {
-    return Column(
-      children: [
-        Expanded(
-          child: widget.congThuc.danhSachBinhLuan.isEmpty
-              ? Center(
+              if (danhSachBinhLuan.isEmpty) {
+                return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.chat_bubble_outline,
                         size: 64,
-                        color: ChuDe.mauChuPhu,
+                        color: Colors.grey.shade400,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'Chưa có bình luận nào',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: ChuDe.mauChuPhu,
+                          color: Colors.grey.shade600,
+                          fontSize: 16,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Hãy là người đầu tiên bình luận về công thức này',
+                      Text(
+                        'Hãy là người đầu tiên chia sẻ cảm nhận!',
                         style: TextStyle(
+                          color: Colors.grey.shade500,
                           fontSize: 14,
-                          color: ChuDe.mauChuPhu,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // Focus vào ô nhập bình luận
-                          FocusScope.of(context).requestFocus(FocusNode());
-                          // Delay để đảm bảo keyboard hiển thị
-                          Future.delayed(const Duration(milliseconds: 100), () {
-                            if (mounted) {
-                              FocusScope.of(context).requestFocus(FocusNode());
-                            }
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ChuDe.mauChinh,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(Icons.chat),
-                        label: const Text('Viết bình luận'),
                       ),
                     ],
                   ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: widget.congThuc.danhSachBinhLuan.length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final binhLuan = widget.congThuc.danhSachBinhLuan[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundImage: AssetImage(binhLuan.anhTacGia),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      binhLuan.tacGia,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      DateFormat('dd/MM/yyyy')
-                                          .format(binhLuan.thoiGian),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: ChuDe.mauChuPhu,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(binhLuan.noiDung),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    TextButton.icon(
-                                      onPressed: () {},
-                                      icon: const Icon(Icons.thumb_up_outlined,
-                                          size: 16),
-                                      label: const Text('Thích'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: ChuDe.mauChuPhu,
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(0, 0),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        textStyle:
-                                            const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    TextButton.icon(
-                                      onPressed: () {},
-                                      icon: const Icon(Icons.reply, size: 16),
-                                      label: const Text('Trả lời'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: ChuDe.mauChuPhu,
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(0, 0),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        textStyle:
-                                            const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(
-                        duration: 500.ms, delay: 300.ms + (index * 100).ms);
-                  },
-                ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(10),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundImage: AssetImage(
-                  Provider.of<DangKiDangNhapEmail>(context)
-                          .nguoiDungHienTai
-                          ?.anhDaiDien ??
-                      'assets/images/avatar.jpg',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _binhLuanController,
-                  decoration: InputDecoration(
-                    hintText: 'Viết bình luận...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
+                );
+              }
+
+              return ListView.builder(
+                itemCount: danhSachBinhLuan.length,
+                itemBuilder: (context, index) {
+                  final binhLuan = danhSachBinhLuan[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                  ),
-                  maxLines: null,
-                ),
-              ),
-              const SizedBox(width: 8),
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: ChuDe.mauChinh,
-                child: IconButton(
-                  onPressed: _guiBinhLuan,
-                  icon: const Icon(Icons.send, size: 18),
-                  color: Colors.white,
-                ),
-              ),
-            ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            _xayDungAvatarBinhLuan(binhLuan.anhTacGia),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    binhLuan.tacGia,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat('dd/MM/yyyy HH:mm')
+                                        .format(binhLuan.thoiGian),
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          binhLuan.noiDung,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ).animate().fadeIn(duration: 300.ms, delay: (index * 50).ms);
+                },
+              );
+            },
           ),
         ),
       ],
     );
   }
-}
 
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
+  Widget _xayDungAvatarBinhLuan(String anhDaiDien) {
+    if (anhDaiDien.isEmpty ||
+        anhDaiDien == 'assets/images/avatar_default.jpg') {
+      return CircleAvatar(
+        radius: 16,
+        backgroundColor: ChuDe.mauChinh,
+        child: const Icon(
+          Icons.person,
+          color: Colors.white,
+          size: 16,
+        ),
+      );
+    }
 
-  _SliverAppBarDelegate(this.tabBar);
+    if (anhDaiDien.startsWith('http')) {
+      return CircleAvatar(
+        radius: 16,
+        backgroundImage: NetworkImage(anhDaiDien),
+        onBackgroundImageError: (exception, stackTrace) {},
+        child: const Icon(
+          Icons.person,
+          color: Colors.white,
+          size: 16,
+        ),
+      );
+    }
 
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.white,
-      child: tabBar,
+    return CircleAvatar(
+      radius: 16,
+      backgroundImage: AssetImage(anhDaiDien),
+      onBackgroundImageError: (exception, stackTrace) {},
+      child: const Icon(
+        Icons.person,
+        color: Colors.white,
+        size: 16,
+      ),
     );
   }
 
-  @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
+  void _hienThiDialogDanhGia() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đánh giá công thức'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Bạn cảm thấy công thức này như thế nào?'),
+            const SizedBox(height: 16),
+            RatingBar.builder(
+              initialRating: _danhGia,
+              minRating: 1,
+              direction: Axis.horizontal,
+              allowHalfRating: true,
+              itemCount: 5,
+              itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+              itemBuilder: (context, _) => const Icon(
+                Icons.star,
+                color: ChuDe.mauVang,
+              ),
+              onRatingUpdate: (rating) {
+                setState(() {
+                  _danhGia = rating;
+                });
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${_danhGia.toStringAsFixed(1)} sao',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: ChuDe.mauChinh,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                _dangHienThiDanhGia = false;
+              });
+            },
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _guiDanhGia();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChuDe.mauChinh,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Gửi đánh giá'),
+          ),
+        ],
+      ),
+    );
   }
 }
