@@ -108,10 +108,10 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
   }
 
   void _langNgheTinNhan() {
-    if (_maCuocTroChuyenId != null) {
+    if (_maCuocTroChuyenId != null && _maNguoiDungHienTai != null) {
       _tinNhanSubscription?.cancel(); // Hủy subscription cũ nếu có
       _tinNhanSubscription = _dichVuTinNhan
-          .langNgheTinNhan(_maCuocTroChuyenId!)
+          .langNgheTinNhan(_maCuocTroChuyenId!, maNguoiDung: _maNguoiDungHienTai!)
           .listen((danhSachTinNhan) {
         if (mounted) {
           setState(() {
@@ -178,11 +178,225 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
     }
   }
 
+  // Xóa tin nhắn cho bản thân
+  Future<void> _xoaTinNhanChoBanThan(TinNhan tinNhan) async {
+    if (_maCuocTroChuyenId == null || _maNguoiDungHienTai == null) return;
+
+    try {
+      final thanhCong = await _dichVuTinNhan.xoaTinNhanChoBanThan(
+        cuocTroChuyenId: _maCuocTroChuyenId!,
+        tinNhanId: tinNhan.ma,
+        maNguoiDung: _maNguoiDungHienTai!,
+      );
+
+      if (thanhCong) {
+        _hienThiThongBao('Đã xóa tin nhắn cho bạn');
+      } else {
+        _hienThiLoi('Không thể xóa tin nhắn');
+      }
+    } catch (e) {
+      _hienThiLoi('Lỗi xóa tin nhắn');
+    }
+  }
+
+  // Xóa tin nhắn cho mọi người
+  Future<void> _xoaTinNhanChoMoiNguoi(TinNhan tinNhan) async {
+    if (_maCuocTroChuyenId == null || _maNguoiDungHienTai == null) return;
+
+    try {
+      final thanhCong = await _dichVuTinNhan.xoaTinNhanChoMoiNguoi(
+        cuocTroChuyenId: _maCuocTroChuyenId!,
+        tinNhanId: tinNhan.ma,
+        maNguoiGui: _maNguoiDungHienTai!,
+      );
+
+      if (thanhCong) {
+        _hienThiThongBao('Đã xóa tin nhắn cho mọi người');
+      } else {
+        _hienThiLoi('Không thể xóa tin nhắn. Chỉ có thể xóa trong 24 giờ.');
+      }
+    } catch (e) {
+      _hienThiLoi('Lỗi xóa tin nhắn');
+    }
+  }
+
+  // Hiển thị menu xóa tin nhắn
+  void _hienThiMenuXoaTinNhan(TinNhan tinNhan) {
+    final laTinNhanCuaToi = tinNhan.maNguoiGui == _maNguoiDungHienTai;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(ChuDe.borderRadiusXLarge),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // Xóa cho bản thân (luôn có)
+            _xayDungTuyChonXoa(
+              icon: Icons.delete_outline_rounded,
+              title: 'Xóa cho bạn',
+              subtitle: 'Tin nhắn sẽ bị xóa khỏi thiết bị này',
+              onTap: () {
+                Navigator.pop(context);
+                _xacNhanXoaTinNhan(
+                  'Xóa tin nhắn cho bạn?',
+                  'Tin nhắn này sẽ bị xóa khỏi thiết bị của bạn.',
+                  () => _xoaTinNhanChoBanThan(tinNhan),
+                );
+              },
+            ),
+            
+            // Xóa cho mọi người (chỉ tin nhắn của mình và trong 24h)
+            if (laTinNhanCuaToi && tinNhan.coTheXoaChoMoiNguoi && !tinNhan.daBiXoa)
+              _xayDungTuyChonXoa(
+                icon: Icons.delete_forever_rounded,
+                title: 'Xóa cho mọi người',
+                subtitle: 'Tin nhắn sẽ bị xóa cho tất cả mọi người',
+                isDestructive: true,
+                onTap: () {
+                  Navigator.pop(context);
+                  _xacNhanXoaTinNhan(
+                    'Xóa tin nhắn cho mọi người?',
+                    'Tin nhắn này sẽ bị xóa cho tất cả mọi người trong cuộc trò chuyện.',
+                    () => _xoaTinNhanChoMoiNguoi(tinNhan),
+                  );
+                },
+              ),
+            
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _xayDungTuyChonXoa({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isDestructive ? Colors.red.shade50 : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
+        ),
+        child: Icon(
+          icon,
+          color: isDestructive ? Colors.red : ChuDe.mauChu,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: isDestructive ? Colors.red : ChuDe.mauChu,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 12,
+          color: isDestructive ? Colors.red.shade300 : ChuDe.mauChuPhu,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  // Xác nhận xóa tin nhắn
+  void _xacNhanXoaTinNhan(String title, String content, VoidCallback onConfirm) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ChuDe.borderRadiusLarge),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        content: Text(
+          content,
+          style: const TextStyle(
+            color: ChuDe.mauChuPhu,
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Hủy',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onConfirm();
+            },
+            child: const Text(
+              'Xóa',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _hienThiLoi(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _hienThiThongBao(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ChuDe.borderRadiusMedium),
@@ -398,72 +612,99 @@ class _ManHinhChiTietTinNhanState extends State<ManHinhChiTietTinNhan>
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: laTinNhanCuaToi ? ChuDe.gradientTinNhan : null,
-                color: laTinNhanCuaToi ? null : Colors.white,
-                borderRadius:
-                    BorderRadius.circular(ChuDe.borderRadiusLarge).copyWith(
-                  bottomLeft: laTinNhanCuaToi
-                      ? const Radius.circular(ChuDe.borderRadiusLarge)
-                      : const Radius.circular(4),
-                  bottomRight: laTinNhanCuaToi
-                      ? const Radius.circular(4)
-                      : const Radius.circular(ChuDe.borderRadiusLarge),
+            child: GestureDetector(
+              onLongPress: () => _hienThiMenuXoaTinNhan(tinNhan),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
-                boxShadow: ChuDe.shadowCard,
-              ),
-              child: tinNhan.loai == 'sticker'
-                  ? Text(
-                      tinNhan.noiDung,
-                      style: const TextStyle(fontSize: 32),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tinNhan.noiDung,
-                          style: TextStyle(
-                            color:
-                                laTinNhanCuaToi ? Colors.white : ChuDe.mauChu,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              tinNhan.thoiGianHienThi,
-                              style: TextStyle(
-                                color: laTinNhanCuaToi
-                                    ? Colors.white.withValues(alpha: 0.8)
-                                    : ChuDe.mauChuPhu,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            if (laTinNhanCuaToi) ...[
-                              const SizedBox(width: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: laTinNhanCuaToi ? ChuDe.gradientTinNhan : null,
+                  color: laTinNhanCuaToi ? null : Colors.white,
+                  borderRadius:
+                      BorderRadius.circular(ChuDe.borderRadiusLarge).copyWith(
+                    bottomLeft: laTinNhanCuaToi
+                        ? const Radius.circular(ChuDe.borderRadiusLarge)
+                        : const Radius.circular(4),
+                    bottomRight: laTinNhanCuaToi
+                        ? const Radius.circular(4)
+                        : const Radius.circular(ChuDe.borderRadiusLarge),
+                  ),
+                  boxShadow: ChuDe.shadowCard,
+                ),
+                child: tinNhan.loai == 'sticker'
+                    ? Text(
+                        tinNhan.noiDung,
+                        style: const TextStyle(fontSize: 32),
+                      )
+                    : tinNhan.daBiXoa
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               Icon(
-                                tinNhan.daDoc
-                                    ? Icons.done_all_rounded
-                                    : Icons.done_rounded,
-                                size: 14,
-                                color: tinNhan.daDoc
-                                    ? Colors.blue.shade300
-                                    : Colors.white.withValues(alpha: 0.8),
+                                Icons.block_rounded,
+                                size: 16,
+                                color: laTinNhanCuaToi 
+                                    ? Colors.white.withValues(alpha: 0.7)
+                                    : ChuDe.mauChuPhu,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                tinNhan.noiDung,
+                                style: TextStyle(
+                                  color: laTinNhanCuaToi 
+                                      ? Colors.white.withValues(alpha: 0.7)
+                                      : ChuDe.mauChuPhu,
+                                  fontSize: 14,
+                                  fontStyle: FontStyle.italic,
+                                ),
                               ),
                             ],
-                          ],
-                        ),
-                      ],
-                    ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tinNhan.noiDung,
+                                style: TextStyle(
+                                  color:
+                                      laTinNhanCuaToi ? Colors.white : ChuDe.mauChu,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    tinNhan.thoiGianHienThi,
+                                    style: TextStyle(
+                                      color: laTinNhanCuaToi
+                                          ? Colors.white.withValues(alpha: 0.8)
+                                          : ChuDe.mauChuPhu,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (laTinNhanCuaToi) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      tinNhan.daDoc
+                                          ? Icons.done_all_rounded
+                                          : Icons.done_rounded,
+                                      size: 14,
+                                      color: tinNhan.daDoc
+                                          ? Colors.blue.shade300
+                                          : Colors.white.withValues(alpha: 0.8),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+              ),
             ),
           ),
           if (laTinNhanCuaToi) const SizedBox(width: 8),

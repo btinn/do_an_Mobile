@@ -13,8 +13,8 @@ class DichVuTinNhan {
     return '${sortedIds[0]}_${sortedIds[1]}';
   }
 
-  // Gửi tin nhắn
-  Future<void> guiTinNhan({
+  // Gửi tin nhắn real-time
+  Future<bool> guiTinNhan({
     required String maNguoiGui,
     required String tenNguoiGui,
     required String anhNguoiGui,
@@ -26,34 +26,41 @@ class DichVuTinNhan {
     String? urlHinhAnh,
     String? maCongThuc,
   }) async {
-    final cuocTroChuyenId = taoMaCuocTroChuyenId(maNguoiGui, maNguoiNhan);
-    final tinNhanId = DateTime.now().millisecondsSinceEpoch.toString();
+    try {
+      final cuocTroChuyenId = taoMaCuocTroChuyenId(maNguoiGui, maNguoiNhan);
+      final tinNhanId = DateTime.now().millisecondsSinceEpoch.toString();
 
-    final tinNhan = {
-      'ma': tinNhanId,
-      'maNguoiGui': maNguoiGui,
-      'tenNguoiGui': tenNguoiGui,
-      'anhNguoiGui': anhNguoiGui,
-      'maNguoiNhan': maNguoiNhan,
-      'tenNguoiNhan': tenNguoiNhan,
-      'anhNguoiNhan': anhNguoiNhan,
-      'noiDung': noiDung,
-      'loai': loai,
-      'thoiGian': DateTime.now().millisecondsSinceEpoch,
-      'daDoc': false,
-      'urlHinhAnh': urlHinhAnh,
-      'maCongThuc': maCongThuc,
-    };
+      final tinNhan = {
+        'ma': tinNhanId,
+        'maNguoiGui': maNguoiGui,
+        'tenNguoiGui': tenNguoiGui,
+        'anhNguoiGui': anhNguoiGui,
+        'maNguoiNhan': maNguoiNhan,
+        'tenNguoiNhan': tenNguoiNhan,
+        'anhNguoiNhan': anhNguoiNhan,
+        'noiDung': noiDung,
+        'loai': loai,
+        'thoiGian': DateTime.now().millisecondsSinceEpoch,
+        'daDoc': false,
+        'urlHinhAnh': urlHinhAnh,
+        'maCongThuc': maCongThuc,
+      };
 
-    // Lưu tin nhắn
-    await _database
-        .child('tin_nhan')
-        .child(cuocTroChuyenId)
-        .child(tinNhanId)
-        .set(tinNhan);
+      // Lưu tin nhắn vào Firebase
+      await _database
+          .child('tin_nhan')
+          .child(cuocTroChuyenId)
+          .child(tinNhanId)
+          .set(tinNhan);
 
-    // Cập nhật cuộc trò chuyện tóm tắt
-    await _capNhatCuocTroChuyenTomTat(cuocTroChuyenId, tinNhan);
+      // Cập nhật cuộc trò chuyện tóm tắt cho cả hai người
+      await _capNhatCuocTroChuyenTomTat(cuocTroChuyenId, tinNhan);
+
+      return true;
+    } catch (e) {
+      debugPrint('Lỗi gửi tin nhắn: $e');
+      return false;
+    }
   }
 
   // Cập nhật cuộc trò chuyện tóm tắt
@@ -76,6 +83,7 @@ class DichVuTinNhan {
       'maNguoiKhac': tinNhan['maNguoiNhan'],
       'tenNguoiKhac': tinNhan['tenNguoiNhan'],
       'anhNguoiKhac': tinNhan['anhNguoiNhan'],
+      'soTinNhanChuaDoc': 0, // Người gửi không có tin nhắn chưa đọc
     });
 
     // Cập nhật cho người nhận
@@ -114,74 +122,33 @@ class DichVuTinNhan {
   }
 
   // Lấy danh sách cuộc trò chuyện tóm tắt
-  Future<List<CuocTroChuyenTomTat>> layDanhSachCuocTroChuyenTomTat(
-      String maNguoiDung) async {
-    // Trả về dữ liệu từ Firebase
-    final snapshot = await _database.child('cuoc_tro_chuyen').child(maNguoiDung).get();
-    final List<CuocTroChuyenTomTat> danhSachCuocTroChuyen = [];
+  // Future<List<CuocTroChuyenTomTat>> layDanhSachCuocTroChuyenTomTat(
+  //     String maNguoiDung) async {
+  //   // Trả về dữ liệu từ Firebase
+  //   final snapshot = await _database.child('cuoc_tro_chuyen').child(maNguoiDung).get();
+  //   final List<CuocTroChuyenTomTat> danhSachCuocTroChuyen = [];
+  //
+  //   if (snapshot.exists) {
+  //     final data = Map<String, dynamic>.from(snapshot.value as Map);
+  //     data.forEach((key, value) {
+  //       final cuocTroChuyenData = Map<String, dynamic>.from(value);
+  //       danhSachCuocTroChuyen.add(CuocTroChuyenTomTat(
+  //         maNguoiKhac: cuocTroChuyenData['maNguoiKhac'],
+  //         tenNguoiKhac: cuocTroChuyenData['tenNguoiKhac'],
+  //         anhNguoiKhac: cuocTroChuyenData['anhNguoiKhac'],
+  //         tinNhanCuoi: cuocTroChuyenData['tinNhanCuoi'],
+  //         loaiTinNhanCuoi: cuocTroChuyenData['loaiTinNhanCuoi'],
+  //         thoiGianCuoi: DateTime.fromMillisecondsSinceEpoch(cuocTroChuyenData['thoiGianCuoi']),
+  //         soTinNhanChuaDoc: cuocTroChuyenData['soTinNhanChuaDoc'] ?? 0,
+  //         dangOnline: cuocTroChuyenData['dangOnline'] ?? false,
+  //       ));
+  //     });
+  //   }
+  //
+  //   return danhSachCuocTroChuyen;
+  // }
 
-    if (snapshot.exists) {
-      final data = Map<String, dynamic>.from(snapshot.value as Map);
-      data.forEach((key, value) {
-        final cuocTroChuyenData = Map<String, dynamic>.from(value);
-        danhSachCuocTroChuyen.add(CuocTroChuyenTomTat(
-          maNguoiKhac: cuocTroChuyenData['maNguoiKhac'],
-          tenNguoiKhac: cuocTroChuyenData['tenNguoiKhac'],
-          anhNguoiKhac: cuocTroChuyenData['anhNguoiKhac'],
-          tinNhanCuoi: cuocTroChuyenData['tinNhanCuoi'],
-          loaiTinNhanCuoi: cuocTroChuyenData['loaiTinNhanCuoi'],
-          thoiGianCuoi: DateTime.fromMillisecondsSinceEpoch(cuocTroChuyenData['thoiGianCuoi']),
-          soTinNhanChuaDoc: cuocTroChuyenData['soTinNhanChuaDoc'] ?? 0,
-          dangOnline: cuocTroChuyenData['dangOnline'] ?? false,
-        ));
-      });
-    }
-
-    return danhSachCuocTroChuyen;
-  }
-
-  // Lấy tin nhắn trong cuộc trò chuyện
-  Future<List<TinNhan>> layTinNhanTrongCuocTroChuyenId(
-      String cuocTroChuyenId) async {
-    final snapshot = await _database.child('tin_nhan').child(cuocTroChuyenId).get();
-    final List<TinNhan> danhSachTinNhan = [];
-
-    if (snapshot.exists) {
-      final data = Map<String, dynamic>.from(snapshot.value as Map);
-      data.forEach((key, value) {
-        final tinNhanData = Map<String, dynamic>.from(value);
-        danhSachTinNhan.add(TinNhan.fromJson({
-          'ma': key,
-          'maNguoiGui': tinNhanData['maNguoiGui'],
-          'tenNguoiGui': tinNhanData['tenNguoiGui'],
-          'anhNguoiGui': tinNhanData['anhNguoiGui'],
-          'maNguoiNhan': tinNhanData['maNguoiNhan'],
-          'tenNguoiNhan': tinNhanData['tenNguoiNhan'],
-          'anhNguoiNhan': tinNhanData['anhNguoiNhan'],
-          'noiDung': tinNhanData['noiDung'],
-          'loai': tinNhanData['loai'],
-          'thoiGian': tinNhanData['thoiGian'],
-          'daDoc': tinNhanData['daDoc'] ?? false,
-          'urlHinhAnh': tinNhanData['urlHinhAnh'],
-          'maCongThuc': tinNhanData['maCongThuc'],
-        }));
-      });
-    }
-
-    return danhSachTinNhan;
-  }
-
-  // Đánh dấu đã đọc
-  Future<void> danhDauDaDoc(String cuocTroChuyenId, String maNguoiDung) async {
-    // Cập nhật số tin nhắn chưa đọc
-    await _database
-        .child('cuoc_tro_chuyen')
-        .child(maNguoiDung)
-        .child(cuocTroChuyenId)
-        .update({'soTinNhanChuaDoc': 0});
-  }
-
-  // Lắng nghe cuộc trò chuyện tóm tắt
+  // Lắng nghe cuộc trò chuyện tóm tắt real-time
   Stream<List<CuocTroChuyenTomTat>> langNgheCuocTroChuyenTomTat(
       String maNguoiDung) {
     return _database.child('cuoc_tro_chuyen').child(maNguoiDung).onValue.map((event) {
@@ -192,53 +159,110 @@ class DichVuTinNhan {
         data.forEach((key, value) {
           final cuocTroChuyenData = Map<String, dynamic>.from(value);
           danhSachCuocTroChuyen.add(CuocTroChuyenTomTat(
-            maNguoiKhac: cuocTroChuyenData['maNguoiKhac'],
-            tenNguoiKhac: cuocTroChuyenData['tenNguoiKhac'],
-            anhNguoiKhac: cuocTroChuyenData['anhNguoiKhac'],
-            tinNhanCuoi: cuocTroChuyenData['tinNhanCuoi'],
-            loaiTinNhanCuoi: cuocTroChuyenData['loaiTinNhanCuoi'],
-            thoiGianCuoi: DateTime.fromMillisecondsSinceEpoch(cuocTroChuyenData['thoiGianCuoi']),
+            maNguoiKhac: cuocTroChuyenData['maNguoiKhac'] ?? '',
+            tenNguoiKhac: cuocTroChuyenData['tenNguoiKhac'] ?? '',
+            anhNguoiKhac: cuocTroChuyenData['anhNguoiKhac'] ?? '',
+            tinNhanCuoi: cuocTroChuyenData['tinNhanCuoi'] ?? '',
+            loaiTinNhanCuoi: cuocTroChuyenData['loaiTinNhanCuoi'] ?? 'text',
+            thoiGianCuoi: DateTime.fromMillisecondsSinceEpoch(cuocTroChuyenData['thoiGianCuoi'] ?? 0),
             soTinNhanChuaDoc: cuocTroChuyenData['soTinNhanChuaDoc'] ?? 0,
             dangOnline: cuocTroChuyenData['dangOnline'] ?? false,
           ));
         });
       }
 
+      // Sắp xếp theo thời gian mới nhất
+      danhSachCuocTroChuyen.sort((a, b) => b.thoiGianCuoi.compareTo(a.thoiGianCuoi));
       return danhSachCuocTroChuyen;
     });
   }
 
-  // Lắng nghe tin nhắn
-  Stream<List<TinNhan>> langNgheTinNhan(String cuocTroChuyenId) {
-    return _database.child('tin_nhan').child(cuocTroChuyenId).onValue.map((event) {
+  // Lấy tin nhắn trong cuộc trò chuyện
+  // Future<List<TinNhan>> layTinNhanTrongCuocTroChuyenId(
+  //     String cuocTroChuyenId) async {
+  //   final snapshot = await _database.child('tin_nhan').child(cuocTroChuyenId).get();
+  //   final List<TinNhan> danhSachTinNhan = [];
+  //
+  //   if (snapshot.exists) {
+  //     final data = Map<String, dynamic>.from(snapshot.value as Map);
+  //     data.forEach((key, value) {
+  //       final tinNhanData = Map<String, dynamic>.from(value);
+  //       danhSachTinNhan.add(TinNhan.fromJson({
+  //         'ma': key,
+  //         'maNguoiGui': tinNhanData['maNguoiGui'],
+  //         'tenNguoiGui': tinNhanData['tenNguoiGui'],
+  //         'anhNguoiGui': tinNhanData['anhNguoiGui'],
+  //         'maNguoiNhan': tinNhanData['maNguoiNhan'],
+  //         'tenNguoiNhan': tinNhanData['tenNguoiNhan'],
+  //         'anhNguoiNhan': tinNhanData['anhNguoiNhan'],
+  //         'noiDung': tinNhanData['noiDung'],
+  //         'loai': tinNhanData['loai'],
+  //         'thoiGian': tinNhanData['thoiGian'],
+  //         'daDoc': tinNhanData['daDoc'] ?? false,
+  //         'urlHinhAnh': tinNhanData['urlHinhAnh'],
+  //         'maCongThuc': tinNhanData['maCongThuc'],
+  //       }));
+  //     });
+  //   }
+  //
+  //   return danhSachTinNhan;
+  // }
+
+  // Lắng nghe tin nhắn real-time
+  Stream<List<TinNhan>> langNgheTinNhan(String cuocTroChuyenId, {String? maNguoiDung}) {
+    return _database.child('tin_nhan').child(cuocTroChuyenId).onValue.asyncMap((event) async {
       final List<TinNhan> danhSachTinNhan = [];
 
       if (event.snapshot.exists) {
         final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-        data.forEach((key, value) {
+        
+        for (final entry in data.entries) {
+          final key = entry.key;
+          final value = entry.value;
           final tinNhanData = Map<String, dynamic>.from(value);
-          danhSachTinNhan.add(TinNhan.fromJson({
-            'ma': key,
-            'maNguoiGui': tinNhanData['maNguoiGui'],
-            'tenNguoiGui': tinNhanData['tenNguoiGui'],
-            'anhNguoiGui': tinNhanData['anhNguoiGui'],
-            'maNguoiNhan': tinNhanData['maNguoiNhan'],
-            'tenNguoiNhan': tinNhanData['tenNguoiNhan'],
-            'anhNguoiNhan': tinNhanData['anhNguoiNhan'],
-            'noiDung': tinNhanData['noiDung'],
-            'loai': tinNhanData['loai'],
-            'thoiGian': tinNhanData['thoiGian'],
-            'daDoc': tinNhanData['daDoc'] ?? false,
-            'urlHinhAnh': tinNhanData['urlHinhAnh'],
-            'maCongThuc': tinNhanData['maCongThuc'],
-          }));
-        });
+          
+          // Kiểm tra tin nhắn có bị xóa cho người dùng này không
+          bool daXoaChoBanThan = false;
+          if (maNguoiDung != null) {
+            daXoaChoBanThan = await kiemTraTinNhanDaXoa(maNguoiDung, cuocTroChuyenId, key);
+          }
+          
+          // Chỉ thêm tin nhắn nếu chưa bị xóa cho người dùng này
+          if (!daXoaChoBanThan) {
+            danhSachTinNhan.add(TinNhan.fromJson({
+              'ma': key,
+              'maNguoiGui': tinNhanData['maNguoiGui'],
+              'tenNguoiGui': tinNhanData['tenNguoiGui'],
+              'anhNguoiGui': tinNhanData['anhNguoiGui'],
+              'maNguoiNhan': tinNhanData['maNguoiNhan'],
+              'tenNguoiNhan': tinNhanData['tenNguoiNhan'],
+              'anhNguoiNhan': tinNhanData['anhNguoiNhan'],
+              'noiDung': tinNhanData['noiDung'],
+              'loai': tinNhanData['loai'],
+              'thoiGian': tinNhanData['thoiGian'],
+              'daDoc': tinNhanData['daDoc'] ?? false,
+              'urlHinhAnh': tinNhanData['urlHinhAnh'],
+              'maCongThuc': tinNhanData['maCongThuc'],
+              'thoiGianXoa': tinNhanData['thoiGianXoa'],
+            }));
+          }
+        }
       }
 
       // Sắp xếp theo thời gian
       danhSachTinNhan.sort((a, b) => a.thoiGian.compareTo(b.thoiGian));
       return danhSachTinNhan;
     });
+  }
+
+  // Đánh dấu đã đọc
+  Future<void> danhDauDaDoc(String cuocTroChuyenId, String maNguoiDung) async {
+    // Cập nhật số tin nhắn chưa đọc
+    await _database
+        .child('cuoc_tro_chuyen')
+        .child(maNguoiDung)
+        .child(cuocTroChuyenId)
+        .update({'soTinNhanChuaDoc': 0});
   }
 
   // Lấy danh sách stories
@@ -278,40 +302,131 @@ class DichVuTinNhan {
   }
 
   // Lấy danh sách tin nhắn
-  Stream<List<TinNhan>> layDanhSachTinNhan(String nguoiDung1, String nguoiDung2) {
-    return _database
-        .child('tin_nhan')
-        .orderByChild('thoiGian')
-        .onValue
-        .map((event) {
-      final List<TinNhan> danhSachTinNhan = [];
+  // Stream<List<TinNhan>> layDanhSachTinNhan(String nguoiDung1, String nguoiDung2) {
+  //   return _database
+  //       .child('tin_nhan')
+  //       .orderByChild('thoiGian')
+  //       .onValue
+  //       .map((event) {
+  //     final List<TinNhan> danhSachTinNhan = [];
+  //
+  //     if (event.snapshot.exists) {
+  //       final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+  //
+  //       data.forEach((key, value) {
+  //         final tinNhanData = Map<String, dynamic>.from(value);
+  //         final nguoiGui = tinNhanData['nguoiGui'];
+  //         final nguoiNhan = tinNhanData['nguoiNhan'];
+  //
+  //         // Chỉ lấy tin nhắn giữa 2 người dùng
+  //         if ((nguoiGui == nguoiDung1 && nguoiNhan == nguoiDung2) ||
+  //             (nguoiGui == nguoiDung2 && nguoiNhan == nguoiDung1)) {
+  //           danhSachTinNhan.add(TinNhan.fromJson({
+  //             'ma': key,
+  //             'nguoiGui': nguoiGui,
+  //             'nguoiNhan': nguoiNhan,
+  //             'noiDung': tinNhanData['noiDung'],
+  //             'thoiGian': tinNhanData['thoiGian'],
+  //             'daDoc': tinNhanData['daDoc'] ?? false,
+  //           }));
+  //         }
+  //       });
+  //     }
+  //
+  //     // Sắp xếp theo thời gian
+  //     danhSachTinNhan.sort((a, b) => a.thoiGian.compareTo(b.thoiGian));
+  //     return danhSachTinNhan;
+  //   });
+  // }
 
-      if (event.snapshot.exists) {
-        final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+  // Kiểm tra cuộc trò chuyện có tồn tại không
+  Future<bool> kiemTraCuocTroChuyenTonTai(String cuocTroChuyenId) async {
+    final snapshot = await _database.child('tin_nhan').child(cuocTroChuyenId).get();
+    return snapshot.exists;
+  }
 
-        data.forEach((key, value) {
-          final tinNhanData = Map<String, dynamic>.from(value);
-          final nguoiGui = tinNhanData['nguoiGui'];
-          final nguoiNhan = tinNhanData['nguoiNhan'];
+  // Xóa tin nhắn cho bản thân
+  Future<bool> xoaTinNhanChoBanThan({
+    required String cuocTroChuyenId,
+    required String tinNhanId,
+    required String maNguoiDung,
+  }) async {
+    try {
+      // Đánh dấu tin nhắn đã bị xóa cho người dùng này
+      await _database
+          .child('tin_nhan_da_xoa')
+          .child(maNguoiDung)
+          .child(cuocTroChuyenId)
+          .child(tinNhanId)
+          .set(true);
+    
+      return true;
+    } catch (e) {
+      debugPrint('Lỗi xóa tin nhắn cho bản thân: $e');
+      return false;
+    }
+  }
 
-          // Chỉ lấy tin nhắn giữa 2 người dùng
-          if ((nguoiGui == nguoiDung1 && nguoiNhan == nguoiDung2) ||
-              (nguoiGui == nguoiDung2 && nguoiNhan == nguoiDung1)) {
-            danhSachTinNhan.add(TinNhan.fromJson({
-              'ma': key,
-              'nguoiGui': nguoiGui,
-              'nguoiNhan': nguoiNhan,
-              'noiDung': tinNhanData['noiDung'],
-              'thoiGian': tinNhanData['thoiGian'],
-              'daDoc': tinNhanData['daDoc'] ?? false,
-            }));
-          }
-        });
+  // Xóa tin nhắn cho mọi người (chỉ người gửi mới được xóa)
+  Future<bool> xoaTinNhanChoMoiNguoi({
+    required String cuocTroChuyenId,
+    required String tinNhanId,
+    required String maNguoiGui,
+  }) async {
+    try {
+      // Kiểm tra thời gian gửi tin nhắn (chỉ cho phép xóa trong 24h)
+      final tinNhanSnapshot = await _database
+          .child('tin_nhan')
+          .child(cuocTroChuyenId)
+          .child(tinNhanId)
+          .get();
+    
+      if (!tinNhanSnapshot.exists) {
+        return false;
       }
+    
+      final tinNhanData = Map<String, dynamic>.from(tinNhanSnapshot.value as Map);
+      final thoiGianGui = DateTime.fromMillisecondsSinceEpoch(tinNhanData['thoiGian']);
+      final thoiGianHienTai = DateTime.now();
+      final chenhLech = thoiGianHienTai.difference(thoiGianGui);
+    
+      // Chỉ cho phép xóa trong 24 giờ
+      if (chenhLech.inHours > 24) {
+        return false;
+      }
+    
+      // Kiểm tra quyền xóa (chỉ người gửi mới được xóa)
+      if (tinNhanData['maNguoiGui'] != maNguoiGui) {
+        return false;
+      }
+    
+      // Cập nhật tin nhắn thành "đã bị xóa"
+      await _database
+          .child('tin_nhan')
+          .child(cuocTroChuyenId)
+          .child(tinNhanId)
+          .update({
+        'noiDung': 'Tin nhắn đã bị xóa',
+        'loai': 'deleted',
+        'thoiGianXoa': DateTime.now().millisecondsSinceEpoch,
+      });
+    
+      return true;
+    } catch (e) {
+      debugPrint('Lỗi xóa tin nhắn cho mọi người: $e');
+      return false;
+    }
+  }
 
-      // Sắp xếp theo thời gian
-      danhSachTinNhan.sort((a, b) => a.thoiGian.compareTo(b.thoiGian));
-      return danhSachTinNhan;
-    });
+  // Kiểm tra tin nhắn có bị xóa cho người dùng không
+  Future<bool> kiemTraTinNhanDaXoa(String maNguoiDung, String cuocTroChuyenId, String tinNhanId) async {
+    final snapshot = await _database
+        .child('tin_nhan_da_xoa')
+        .child(maNguoiDung)
+        .child(cuocTroChuyenId)
+        .child(tinNhanId)
+        .get();
+  
+    return snapshot.exists && (snapshot.value as bool? ?? false);
   }
 }

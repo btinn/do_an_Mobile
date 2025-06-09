@@ -12,6 +12,7 @@ class TinNhan {
   final bool daDoc;
   final String? urlHinhAnh;
   final String? maCongThuc;
+  final int? thoiGianXoa; // Thêm thuộc tính này
 
   // Thêm các thuộc tính cũ để tương thích
   final String? nguoiGui;
@@ -31,6 +32,7 @@ class TinNhan {
     this.daDoc = false,
     this.urlHinhAnh,
     this.maCongThuc,
+    this.thoiGianXoa, // Thêm vào constructor
     this.nguoiGui,
     this.nguoiNhan,
   });
@@ -51,7 +53,19 @@ class TinNhan {
        anhNguoiNhan = '',
        loai = 'text',
        urlHinhAnh = null,
-       maCongThuc = null;
+       maCongThuc = null,
+       thoiGianXoa = null; // Thêm vào constructor cũ
+
+  // Thêm getter để kiểm tra tin nhắn có bị xóa không
+  bool get daBiXoa => loai == 'deleted';
+  
+  // Thêm getter để kiểm tra có thể xóa cho mọi người không (trong 24h)
+  bool get coTheXoaChoMoiNguoi {
+    if (daBiXoa) return false;
+    final thoiGianHienTai = DateTime.now();
+    final chenhLech = thoiGianHienTai.difference(thoiGian);
+    return chenhLech.inHours <= 24;
+  }
 
   String get thoiGianHienThi {
     final now = DateTime.now();
@@ -87,6 +101,7 @@ class TinNhan {
       daDoc: json['daDoc'] ?? false,
       urlHinhAnh: json['urlHinhAnh'],
       maCongThuc: json['maCongThuc'],
+      thoiGianXoa: json['thoiGianXoa'], // Thêm vào fromJson
       nguoiGui: json['nguoiGui'],
       nguoiNhan: json['nguoiNhan'],
     );
@@ -107,6 +122,7 @@ class TinNhan {
       'daDoc': daDoc,
       'urlHinhAnh': urlHinhAnh,
       'maCongThuc': maCongThuc,
+      'thoiGianXoa': thoiGianXoa, // Thêm vào toJson
       'nguoiGui': nguoiGui,
       'nguoiNhan': nguoiNhan,
     };
